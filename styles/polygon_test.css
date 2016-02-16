@@ -1,0 +1,22 @@
+#hidden_canvas {
+	position: absolute;
+}
+
+.wrapper {
+	display: inline-block;
+	width: 100%;
+}
+
+.wrapper .controls {
+	width: 90%;
+	text-align: left;
+	margin: 0px auto;
+}
+
+#canvas {
+	height: auto;
+	width: auto;
+	border-color: #000;
+	border-style: solid;
+	border-width: 1px;
+}

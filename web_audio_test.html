@@ -1,0 +1,115 @@
+<!DOCTYPE>
+<html>
+<head>
+	<title>Web Audio Test</title>
+	<script src="http://code.jquery.com/jquery-1.12.0.min.js"></script>
+	<script>
+		var mouse_info = {x: 0, y: 0},
+		audio_context,
+		audio_panner,
+		audio_buffer, 
+		audio_timer;
+		
+		window.AudioContext = window.AudioContext || window.webkitAudioContext;
+		audio_context = new AudioContext();
+		audio_panner = audio_context.createPanner();
+		
+		audio_panner.connect(audio_context.destination);
+		audio_panner.panningModel = 'HRTF';
+		audio_panner.distanceModel = 'inverse';
+		audio_panner.coneOuterGain = 1;
+		audio_panner.coneOuterAngle = 360;
+		audio_panner.coneInnerAngle = 0;
+		audio_panner.refDistance = 50;
+		audio_panner.maxDistance = 10000;
+		audio_panner.rolloffFactor = 0.5;
+		
+		audio_panner.setOrientation(1, 0, 0);
+		//panner.distanceModel = 'exponential';
+		
+		var request = new XMLHttpRequest();
+		request.open('GET', 'sounds/explode.wav', true);
+		request.responseType = 'arraybuffer';
+		
+		request.onload = function(){
+			console.log('request', request.response);
+			audio_context.decodeAudioData(request.response, function(buffer) {
+				if(!buffer)
+				{
+					console.error('Failed to load:', 'sounds/explode.wav');
+					audio_buffer = false;
+					return;
+				}
+				
+				console.info('Loaded:', 'sounds/explode.wav');
+				audio_buffer = buffer;
+				
+				audio_timer = window.setInterval(function(){
+					var source = audio_context.createBufferSource();
+					source.buffer = audio_buffer;
+					source.connect(audio_panner);
+					audio_context.listener.setPosition($(window).width()/2, $(window).height()/2, 300);
+
+					//audio_context.listener.dopplerFactor = 2;
+					audio_panner.setPosition(mouse_info.x, mouse_info.y, 0);
+					source.start(0);
+				}, 500);
+			}
+		), function(){console.error('failed')}};
+		
+		request.send();
+		jQuery(function($){
+			
+			$(window).on('mousemove', function(e){
+				mouse_info.x = e.clientX;
+				mouse_info.y = e.clientY;
+				
+				$('#mouse_info').html(mouse_info.x+' '+mouse_info.y);
+			});
+		});
+	</script>
+	<style>
+		html, body {
+			margin: 0;
+			padding: 0;
+			height: 100%;
+			width: 100%;
+			background-color: #8b8e89;
+		}
+		
+		.table {
+			display: table;
+			width: 100%;
+			height: 100%;
+		}
+		
+		.cell {
+			display: table-cell;
+			vertical-align: middle;
+			text-align: center;
+		}
+		
+		#center {
+			width: 50px;
+			height: 50px;
+			margin: 0px auto;
+			background-color: #fff;
+		}
+		
+		#mouse_info {
+			position: absolute;
+			left: 0;
+			top: 0;
+		}
+	</style>
+</head>
+<body>
+	<span id="mouse_info"></span>
+	<div class="table">
+		<div class="cell">
+			<div id="center">
+			</div>
+		</div>
+	</div>
+</body>
+</html>
