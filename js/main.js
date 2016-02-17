@@ -24,8 +24,8 @@ var weapon_data = [
 			dmg: 1,
 			hit_sound_url: 'sounds/explode.wav'
 		},
-		firerate: 10,
-		spread: 5,
+		firerate: 5,
+		spread: 3,
 		fire_sound_url:'sounds/shoot.wav',
 		
 		id: 0
@@ -189,9 +189,12 @@ GSS = {
 						{
 							var projectile = a_type == 'GSSProjectile' ? a_GSSObject : b_GSSObject,
 							entity = a_type == 'GSSEntity' ? a_GSSObject : b_GSSObject;
-					
+							
+							if(projectile.mark_for_delete || entity.mark_for_delete)
+								return;
+								
 							projectile.destroy(true);
-							entity.damage(0);
+							entity.damage(projectile.damage);
 						}
 					}
 					// Do stuff if it hits something
@@ -223,9 +226,9 @@ GSS = {
 
 			window.addEventListener('all_assets_loaded', function(){
 				console.log('All assets loaded: Showing player');
-				window.player = GSS.addEntity(0, 0, true);
+				window.player = GSS.addEntity(0, 0, {is_player: true});
 				
-				window.target = GSS.addEntity(1, 0, false);
+				window.target = GSS.addEntity(1, 0, {x: 0, y: -100});
 			});
 			
 			// Load assets
@@ -532,23 +535,32 @@ GSS = {
 		clearInterval(GSS.update_timer);
 		GSS.update_timer = null;
 	},
-	addEntity: function(faction_id, entity_data_index, is_player)
+	addEntity: function(faction_id, entity_data_index, options)
 	{
-		var data = clone(GSS.entity_data[entity_data_index]),
+		var 
+		defaults = {
+			x: 0,
+			y: 0,
+			is_player: false
+		},
+		data = clone(GSS.entity_data[entity_data_index]),
 		new_entity;
-		if(is_player)
-		{
-			// Clear the current player
-			if(GSS.player !== undefined && GSS.player)
-				GSS.player.is_player = false;
 		
+		options = extend(defaults, options);
+		
+		if(faction_id === undefined || entity_data_index === undefined || (options.is_player && GSS.player))
+			return;
+		
+		if(options.is_player && !GSS.player)
 			data.is_player = true;
-		}
-	
+		
+		data.x = options.x;
+		data.y = options.y;
 		data.faction_id = faction_id;
 	
 		new_entity = new GSSEntity(GSS.entities_index++, data);
-		if(is_player)
+		console.log(options, GSS.player);
+		if(options.is_player && !GSS.player)
 			GSS.player = new_entity;
 	
 		GSS.entities.push(new_entity);

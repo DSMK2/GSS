@@ -59,6 +59,7 @@ function GSSEntity(index, options) {
 	this.is_player = options.is_player;
 	this.faction = options.faction_id;
 	this.mark_for_delete = false;
+	this.hp = options.hp;
 	
 	// Weapons handling
 	this.weapons = [];
@@ -178,11 +179,14 @@ GSSEntity.prototype = {
 		if(this.damage_effect)
 			return;
 		
+		this.hp-=damage;
+		
 		this.damage_effect = true;
 		this.damage_next = this.damage_delay+Date.now();
 		this.material.color = new THREE.Color("hsl(0, 100%, 80%)");
 		this.mesh_plane.scale.x = this.damage_scale;
 		this.mesh_plane.scale.y = this.damage_scale;
+		
 	},
 	destroy: function(){
 		if(this.mark_for_delete)
