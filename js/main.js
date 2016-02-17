@@ -46,6 +46,18 @@ entity_data = [
 		thrust_deceleration: 25, 
 		velocity_magnitude_max: 10, 
 		weapons:[{x: -21, y: 0, weapon_id: 0}]
+	},
+	{
+		image_data: {
+			url: 'images/test_target.png', 
+			frames: 5, 
+			frame_rate: 500, 
+		}, 
+		angle: 90, 
+		angular_velocity_max: 0, 
+		angular_acceleration: 45, 
+		thrust_acceleration: 1, 
+		thrust_deceleration: 25, 
 	}
 ],
 faction_data = [
@@ -228,7 +240,7 @@ GSS = {
 				console.log('All assets loaded: Showing player');
 				window.player = GSS.addEntity(0, 0, {is_player: true});
 				
-				window.target = GSS.addEntity(1, 0, {x: 0, y: -100});
+				window.target = GSS.addEntity(1, 1, {x: 0, y: -100});
 			});
 			
 			// Load assets
@@ -291,11 +303,11 @@ GSS = {
 				current_entity_data = entity_data[e]
 				body_image_data = current_entity_data.image_data;
 				existing_index = -1;
-				
+				console.log(body_image_data);
 				// Find duplicate images
 				for(var a = 0; a < GSS.image_data.length; a++)
 				{
-					if(image_url == body_image_data.url)
+					if(GSS.image_data[a].url == body_image_data.url)
 					{
 						existing_index = a;
 						break;
