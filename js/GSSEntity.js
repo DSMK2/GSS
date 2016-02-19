@@ -5,7 +5,11 @@ GSSEntity.defaults = {
 	is_player: false,
 	faction_id: -1,
 	hp: 100, 
-	shield: 100,
+	shield_max: 100,
+	shield_regen_rate: 10,
+	shield_regen_amount: 1,
+	shield_regen_delay: 1000,
+	
 	// Weapons data
 	/*
 	Example: {x: 0, y: 0, weapon: <GSSWeapon>, group: 0} and so on
@@ -13,6 +17,8 @@ GSSEntity.defaults = {
 	weapons: [],
 	power_max: 100,
 	power_regen: 10,
+	
+	onDeathCallback: function(),
 	
 	triangles: [],
 	
@@ -59,7 +65,19 @@ function GSSEntity(index, options) {
 	this.is_player = options.is_player;
 	this.faction = options.faction_id;
 	this.mark_for_delete = false;
+	
+	// Health and shields
+	// Shields regenerate health doesn't
 	this.hp = options.hp;
+	this.shield_max = options.shield_max;
+	this.shield = this.shield_max;
+	this.shield_depleted = false;
+	
+	this.shield_regen_rate = options.shield_regen_rate;
+	this.shield_regen_next = Date.now();
+	this.shield_regen_amount = options.shield_regen_amount;
+	this.shield_regen_delay = options.shield_regen_delay; // Should only apply when shields are depleted 
+	this.shield_regen_delay_next = Date.now();
 	
 	// Weapons handling
 	this.weapons = [];
@@ -179,7 +197,17 @@ GSSEntity.prototype = {
 		if(this.damage_effect)
 			return;
 		
-		this.hp-=damage;
+		this.shield-=damage;
+		this.shield = this.shield < 0 ? 0 : this.shield;
+		
+		if(this.shield === 0)
+		{
+			this.shield_depleted = true;
+			this.shield_regen_delay_next = Date.now()+this.shield_regen_delay;
+			
+			this.hp-=damage;
+			this.hp = this.hp < 0 ? 0 : this.hp;
+		}
 		
 		this.damage_effect = true;
 		this.damage_next = this.damage_delay+Date.now();
@@ -356,6 +384,7 @@ GSSEntity.prototype = {
 			}
 			// END: Angular Movement (Mouse Tracking)
 		}
+		// No AI controlling this
 		else
 		{
 			deceleration_thrust = new b2Vec2(0,0);
@@ -366,15 +395,28 @@ GSSEntity.prototype = {
 			y_force = Math.abs(y_force) >= this.thrust_deceleration ? this.thrust_deceleration*(y_force > 0 ? -1 : 1): -y_force;
 			this.entity_body.ApplyForceToCenter(new b2Vec2(x_force, y_force), true);
 			
-			/*
-			// Find acceleration for a step needed to move angle_delta
-			angular_acceleration_needed = ((angle_delta-this.angular_velocity_current)/GSS.FPS).clamp(-this.angular_acceleration, this.angular_acceleration);
-
+			angular_acceleration_needed = (-this.angular_velocity_current/GSS.FPS).clamp(-this.angular_acceleration, this.angular_acceleration);
 			torque = this.entity_body.GetInertia()*angular_acceleration_needed;
-			this.entity_body.ApplyTorque(torque);
-			*/
+					this.entity_body.ApplyTorque(torque);
+					
+			// Cap angular velocity
+					this.angular_velocity_current = this.entity_body.GetAngularVelocity();
+					if(Math.abs(this.angular_velocity_current) > this.angular_velocity_max)
+						this.entity_body.SetAngularVelocity(dir*this.angular_velocity_max);
 		}
 		
+		// Shield regeneration
+		if(this.shield < this.shield_max && !this.shield_depleted && Date.now() >= this.shield_regen_next)
+		{
+			this.shield+=this.shield_regen_amount;
+			this.shield = this.shield > this.shield_max ? this.shield_max : this.shield;
+			
+			this.shield_regen_next = Date.now()+this.shield_regen_rate;
+		}
+		else if(this.shield_depleted && Date.now() >= this.shield_regen_delay_next)
+			this.shield_depleted = false;
+		
+		// Animation
 		if(Date.now() >= this.frame_next && !this.body_image_data.animate_on_fire)
 		{
 			
@@ -394,6 +436,7 @@ GSSEntity.prototype = {
 			this.mesh_plane.material.map.offset.x = 1-(this.three_data.width*(1/(0+1)))/this.three_data.width;
 		}
 		
+		// Damage effect "recovery"
 		if(this.material.color.getHex() != 0xffffff && Date.now() > this.damage_next)
 		{
 			this.material.color = new THREE.Color("rgb(255, 255, 255)");

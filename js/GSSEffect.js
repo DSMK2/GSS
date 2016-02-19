@@ -11,7 +11,8 @@ GSSEffect.defaults = {
 	animate_with_lifetime : false,
 	x: 0, 
 	y: 0,
-	lifetime: 1000	
+	lifetime: 1000,
+	scale: 1
 };
 
 function GSSEffect(options){
@@ -40,6 +41,8 @@ function GSSEffect(options){
 	this.mesh_plane = new THREE.Mesh(new THREE.PlaneGeometry(this.mesh_data.width/this.image_frames, this.mesh_data.height), this.material);
 	this.mesh_plane.position.x = options.x;
 	this.mesh_plane.position.y = options.y;
+	this.mesh_plane.scale.x = options.scale;
+	this.mesh_plane.scale.y = options.scale;
 	GSS.scene.add(this.mesh_plane);
 	// END: THREE.js
 	
