@@ -32,6 +32,7 @@ function GSSEffect(options){
 	this.time_to_next_frame = Date.now()+this.image_frame_rate;
 	
 	// BEGIN: THREE.js 
+	console.log(GSS.image_data[this.image_data.image_index], this.image_data.image_index);
 	this.mesh_data = GSS.image_data[this.image_data.image_index];
 	this.texture = this.mesh_data.texture.clone();
 	this.texture.needsUpdate = true;
@@ -41,6 +42,7 @@ function GSSEffect(options){
 	this.mesh_plane = new THREE.Mesh(new THREE.PlaneGeometry(this.mesh_data.width/this.image_frames, this.mesh_data.height), this.material);
 	this.mesh_plane.position.x = options.x;
 	this.mesh_plane.position.y = options.y;
+	console.info('SCALE', options.scale);
 	this.mesh_plane.scale.x = options.scale;
 	this.mesh_plane.scale.y = options.scale;
 	GSS.scene.add(this.mesh_plane);

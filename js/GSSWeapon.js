@@ -17,11 +17,12 @@ GSSProjectile.defaults = {
 	homing_radius: 0, 
 	lifetime: 1000,
 	hit_effect_data: false,
-	hit_sound_index: false,
+	hit_sound_index: -1,
 	image_frames : 1,
 	image_frame_rate: 100,
 	image_data: false,
-	damage: 1
+	damage: 1,
+	offset_by_length: false
 };
 
 
@@ -47,11 +48,11 @@ function GSSProjectile(GSSEntity_parent, options) {
 	this.velocity_max = options.velocity_max;
 	this.velocity_inherit = options.velocity_inherit;
 	
+	this.damage = options.damage;
 	// Important look at this later.
 	
 	this.velocity_initial = new b2Vec2(-options.velocity_initial*Math.cos(options.angle), -options.velocity_initial*Math.sin(options.angle));
 	var offset_velocity = this.parent.entity_body.GetLinearVelocity();
-	//b2Vec2.Add(offset_velocity, this.velocity_initial, (this.velocity_inherit ? this.parent.entity_body.GetLinearVelocity() : new b2Vec2(0, 0)));
 	var scalar = (this.velocity_initial.x*offset_velocity.x+this.velocity_initial.y*offset_velocity.y)/Math.pow(this.velocity_initial.Length(), 2);
 	b2Vec2.MulScalar(offset_velocity, this.velocity_initial, scalar < 0 ? 0 : scalar);
 	
@@ -87,7 +88,8 @@ function GSSProjectile(GSSEntity_parent, options) {
 	this.projectile_body_def = new b2BodyDef();
 	this.projectile_body_def.type = b2_dynamicBody;
 	this.projectile_body_def.bullet = true;
-	this.projectile_body_def.position = new b2Vec2(options.x, options.y);
+	 
+	this.projectile_body_def.position = new b2Vec2(options.x+(options.offset_by_length ? this.mesh_data.width/2/GSS.PTM*Math.cos(options.angle) : 0), options.y+(options.offset_by_length ? this.mesh_data.height/2/GSS.PTM*Math.sin(options.angle) : 0));
 	this.projectile_body_def.angle = options.angle;
 	
 	this.projectile_fixture_def = new b2FixtureDef();
@@ -173,7 +175,8 @@ GSSProjectile.prototype = {
 		
 		if(with_effect !== undefined && with_effect)
 		{
-			GSS.playSound(this.hit_sound_index, this.projectile_body.GetPosition().x, this.projectile_body.GetPosition().y);
+			if(this.hit_sound_index != -1)
+				GSS.playSound(this.hit_sound_index, this.projectile_body.GetPosition().x, this.projectile_body.GetPosition().y);
 			if(this.hit_effect_data)
 				GSS.addEffect(this.hit_effect_data, this.projectile_body.GetPosition().x*GSS.PTM, this.projectile_body.GetPosition().y*GSS.PTM);	
 		}
@@ -187,7 +190,7 @@ GSSWeapon.defaults = {
 	
 	// Weapon fire image and sounds
 	fire_image_index: 0,
-	fire_sound_index: 0,
+	fire_sound_index: -1,
 	
 	// Weapon fire data
 	power_cost: 0,
@@ -282,6 +285,7 @@ GSSWeapon.prototype = {
 					new_data.velocity_magnitude = this.velocity;
 					new_data.x =  new_x+parent_position.x;//-1/2/GSS.PTM*Math.cos(target_angle), 
 					new_data.y =  new_y+parent_position.y;//-1/2/GSS.PTM*Math.sin(target_angle),
+					new_data.offset_by_length = true;
 					GSS.projectiles.push(new GSSProjectile(this.parent, new_data));
 				
 				// Oscillation handling
@@ -321,11 +325,13 @@ GSSWeapon.prototype = {
 					new_data.velocity_magnitude = this.velocity;
 					new_data.x =  new_x+parent_position.x;//-1/2/GSS.PTM*Math.cos(target_angle), 
 					new_data.y =  new_y+parent_position.y;//-1/2/GSS.PTM*Math.sin(target_angle),
+					new_data.offset_by_length = true;
 					GSS.projectiles.push(new GSSProjectile(this.parent, new_data));
 				}
 			}
 			
-			GSS.playSound(this.fire_sound_index, new_x+parent_position.x, new_y+parent_position.y);
+			if(this.fire_sound_index != -1)
+				GSS.playSound(this.fire_sound_index, new_x+parent_position.x, new_y+parent_position.y);
 			this.last_fired = time_current;
 		}
 	}

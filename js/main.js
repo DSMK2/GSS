@@ -21,10 +21,10 @@ var weapon_data = [
 				lifetime: 200,
 				animate_with_lifetime: true
 			},
-			dmg: 1,
+			damage: 100,
 			hit_sound_url: 'sounds/explode.wav'
 		},
-		firerate: 5,
+		firerate: 10,
 		spread: 3,
 		fire_sound_url:'sounds/shoot.wav',
 		
@@ -46,6 +46,7 @@ entity_data = [
 		thrust_deceleration: 25, 
 		velocity_magnitude_max: 10, 
 		weapons:[{x: -21, y: 0, weapon_id: 0}]
+		
 	},
 	{
 		image_data: {
@@ -54,10 +55,20 @@ entity_data = [
 			frame_rate: 500, 
 		}, 
 		angle: 90, 
-		angular_velocity_max: 0, 
-		angular_acceleration: 45, 
+		//angular_velocity_max: 20, 
+		angular_acceleration: 25, 
 		thrust_acceleration: 1, 
-		thrust_deceleration: 25, 
+		thrust_deceleration: 50, 
+		death_effect_data: {
+			image_data: {
+				url: 'images/projectile_hit.png', 
+				frames: 5,
+				frame_rate: 500
+			},
+			lifetime: 200,
+			animate_with_lifetime: true,
+			scale: 10
+		}
 	}
 ],
 faction_data = [
@@ -164,6 +175,7 @@ GSS = {
 			// Collision handling
 			GSS.world.SetContactListener({
 				BeginContactBody: function(contact) {
+					
 					var
 					a = contact.GetFixtureA(),
 					b = contact.GetFixtureB(),
@@ -195,7 +207,7 @@ GSS = {
 					// Do stuff if the projectile hits a GSS_ thing
 					if(a_GSSData !== undefined && b_GSSData !== undefined)
 					{	
-						console.log('asdf', a_type, b_type);
+						
 						// Projectiles cannot interact with each other
 						if((a_type == 'GSSProjectile' || b_type == 'GSSProjectile') &&  (a_type == 'GSSEntity' || b_type == 'GSSEntity'))
 						{
@@ -300,27 +312,55 @@ GSS = {
 			for(var e = 0; e < entity_data.length; e++)
 			{
 				var 
-				current_entity_data = entity_data[e]
-				body_image_data = current_entity_data.image_data;
-				existing_index = -1;
+				current_entity_data = entity_data[e],
+				body_image_data = current_entity_data.image_data,
+				death_effect_data = current_entity_data.death_effect_data,
+				death_effect_image_data,
+				entity_image_existing_index = -1,
+				death_effect_image_existing_index = -1;
 				console.log(body_image_data);
+
 				// Find duplicate images
 				for(var a = 0; a < GSS.image_data.length; a++)
 				{
 					if(GSS.image_data[a].url == body_image_data.url)
 					{
-						existing_index = a;
+						entity_image_existing_index = a;
 						break;
 					}
 				}
-		
-				if(existing_index == -1)
+				
+				
+				
+				if(entity_image_existing_index == -1)
 				{
 					GSS.image_data.push({url: body_image_data.url, index: GSS.image_data.length, frames: body_image_data.frames});
-					existing_index = GSS.image_data.length-1;
+					entity_image_existing_index = GSS.image_data.length-1;
 				}
 				
-				body_image_data.image_index = existing_index;
+				if(death_effect_data !== undefined)
+				{
+					death_effect_image_data = death_effect_data.image_data;
+					for(var d = 0; d < GSS.image_data.length; d++)
+					{
+						if(GSS.image_data[d].url == death_effect_image_data.url)
+						{
+							death_effect_image_existing_index = d;
+							break;
+						}
+					}
+					
+					if(death_effect_image_data !== undefined && death_effect_image_existing_index == -1)
+					{
+						GSS.image_data.push({url: death_effect_image_data.url, index: GSS.image_data.length, frames: death_effect_image_data.frames});
+						death_effect_image_existing_index = GSS.image_data.length-1;
+					}
+					
+					death_effect_image_data.image_index = death_effect_image_existing_index;
+				}
+				
+				body_image_data.image_index = entity_image_existing_index;
+				
 				GSS.entity_data.push(current_entity_data);
 			}
 			
@@ -508,6 +548,9 @@ GSS = {
 		// Clean up
 		while(GSS.entities_to_remove.length !== 0)
 		{
+			var entity = GSS.entities_to_remove.pop(),
+			index = GSS.getEntityWithID(entity.id);
+			GSS.entities.splice(index, 1);
 		}
 		
 		while(GSS.projectiles_to_remove.length !== 0)
@@ -585,6 +628,35 @@ GSS = {
 		data.x = x;
 		data.y = y;
 		GSS.effects.push(new GSSEffect(data));
+	},
+	/* TODO: Combine these three functions to one */
+	getEntityWithID: function(id, start, end){
+		var halfway, candidate;
+
+		if(end-start <= 0 || id === undefined)
+		{
+			if(GSS.entities[start].id == id)
+				return start;
+			else
+				return -1;
+		}
+		start = start === undefined ? 0 : start;
+		end = end === undefined ? GSS.projectiles.length-1 : end;
+		halfway = start+Math.floor((end-start)/2);
+		candidate = GSS.entities[halfway];
+	
+		if(candidate === undefined || candidate.id === undefined)
+			return -1;
+	
+		if(candidate.id == id)
+			return halfway; 
+		else
+		{
+			if(id > candidate.id)
+				return GSS.getEntityWithID(id, halfway+1, end);
+			else
+				return GSS.getEntityWithID(id, start, halfway);
+		}
 	},
 	/**
 	* Will assume the projectile array is sorted
@@ -671,66 +743,15 @@ GSS = {
 			panner.rolloffFactor = 0.5;
 			panner.setOrientation(1, 0, 0);
 			panner.connect(GSS.audio_gain);
-			
-			source = GSS.audio_context.createBufferSource();
-			source.buffer = GSS.audio_data[index].buffer;
-			source.connect(panner);
-//			console.log(GSS.canvas.width/2, GSS.canvas.height/2, x*GSS.PTM, GSS.camera.position.x, x-GSS.camera.position.x+GSS.canvas.width/2);
 			panner.setPosition(x*GSS.PTM-GSS.camera.position.x+GSS.canvas.width/2, y*GSS.PTM-GSS.camera.position.y+GSS.canvas.height/2, 0);
-			
-			source.start(0);
-			/*
-			var panner = GSS.audio_context.createPanner();
-			panner.coneOuterGain = 1;
-			panner.coneOuterAngle = 180;
-			panner.coneInnerAngle  = 0;
-			
-			//x-=canvas.width/2*(x/canvas.width/2)
-			//y-=canvas.height/2*(y/canvas.height/2);
-			//x+=GSS.camera.position.x;
-			//y+=GSS.camera.position.y;
-			//console.log(x, y);
- 			// Figure out how to translate x, y positions to canvas space
+
 			source = GSS.audio_context.createBufferSource();
 			source.buffer = GSS.audio_data[index].buffer;
-			panner.connect(GSS.audio_context.destination);
-			panner.distanceModel = 'exponential';
-			var angle = Math.atan2(GSS.mouse_info.y-canvas_height/2, GSS.mouse_info.x-canvas_width/2)
-			console.log(x, y);
-			panner.setOrientation(Math.cos(angle), Math.sin(angle), 1);
-			GSS.audio_context.listener.setPosition(x, y );
 			source.connect(panner);
-			*/
-			
-			//GSS.audio_panner.setPosition(x, y, 0);
-			
-			
+			source.start(0);	
 		}
 	}
 };
-
-// A* algorithm implementation
-var node_size = 1000;
-// From world center
-function getNodeDataAtPoint(x, y){
-	var node_x = Math.floor(x/node_size),
-	node_y = Math.floor(y/node_size),
-	bounds = {upperBound: new b2Vec2(node_x, node_y), lowerBound: new b2Vec2(node_x+node_size, node_y+node_size)};
-	var array_test = [];
-	function test(p){
-		this.point = p;
-		this.fixture = null;
-	}
-	test.prototype.ReportFixture = function(asdf)
-	{
-		array_test.push(asdf.body);
-		this.fixture = asdf;
-		return true;
-	};
-	var test_p = new test(new b2Vec2(0,0));
-	world.QueryAABB(test_p, bounds, array_test);
-}
-	
 
 jQuery(function($){
 	var $canvas = $('#canvas');
