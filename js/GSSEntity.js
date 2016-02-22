@@ -4,6 +4,8 @@ GSSEntity.defaults = {
 	angle: 0,
 	is_player: false,
 	faction_id: -1,
+	
+	invincible: false,
 	hp_max: 100, 
 	shield_max: 100,
 	shield_regen_rate: 1000,
@@ -70,6 +72,7 @@ function GSSEntity(index, options) {
 	
 	// Health and shields
 	// Shields regenerate health doesn't
+	this.invincible = options.invincible;
 	this.hp_max = options.hp_max;
 	this.hp = this.hp_max;
 	this.shield_max = options.shield_max;
@@ -141,6 +144,18 @@ function GSSEntity(index, options) {
 	this.damage_effect = false;
 	this.damage_scale = 2;
 	this.damage_color = 0xff0000;
+	
+	this.display_hp = false;
+	this.display_shield = false;
+	this.display_hp_mesh = new THREE.Mesh(new THREE.PlaneGeometry(50, 5), GSS.hp_bar_texture);
+	this.display_shield_mesh = new THREE.Mesh(new THREE.PlaneGeometry(50, 5), GSS.shield_bar_texture);
+	this.display_hp_mesh.position.x = this.mesh_plane.position.x+this.three_data.width + 2;
+	this.display_hp_mesh.position.y = this.mesh_plane.position.y;
+	this.display_shield_mesh.position.x = this.mesh_plane.position.x+this.three_data.width + 2;
+	this.display_shield_mesh.position.y = this.mesh_plane.position.y-15;
+	
+	GSS.scene.add(this.display_hp_mesh);
+	GSS.scene.add(this.display_shield_mesh);
 	// END: THREE.js
 	
 	// BEGIN: liquidfun
@@ -199,7 +214,7 @@ GSSEntity.prototype = {
 		return angle;
 	},
 	damage: function(damage){
-		if(damage === undefined || !damage || damage <= 0)
+		if(damage === undefined || !damage || damage <= 0 || this.invincible)
 			return;
 		
 	
@@ -224,6 +239,8 @@ GSSEntity.prototype = {
 			console.log('hit');
 			this.destroy(true);
 		}
+		
+		console.log('result', this.shield, this.hp);
 		
 		if(this.damage_effect)
 			return;
@@ -456,6 +473,16 @@ GSSEntity.prototype = {
 		}
 		else if(this.shield_depleted && Date.now() >= this.shield_regen_delay_next)
 			this.shield_depleted = false;
+		
+		this.display_hp_mesh.scale.x = this.hp/this.hp_max;
+		this.display_shield_mesh.scale.x = this.shield/this.shield_max;
+		
+		this.display_hp_mesh.position.x = this.mesh_plane.position.x+this.three_data.width/2 + 2+(25*this.display_hp_mesh.scale.x-25);
+		this.display_hp_mesh.position.y = this.mesh_plane.position.y;
+		this.display_shield_mesh.position.x = this.mesh_plane.position.x+this.three_data.width/2 + 2+(25*this.display_shield_mesh.scale.x-25);
+		this.display_shield_mesh.position.y = this.mesh_plane.position.y-15;
+		
+		
 		
 		// Animation
 		if(Date.now() >= this.frame_next && !this.body_image_data.animate_on_fire)

@@ -21,11 +21,13 @@ var weapon_data = [
 				lifetime: 200,
 				animate_with_lifetime: true
 			},
-			damage: 100,
-			hit_sound_url: 'sounds/explode.wav'
+			damage: 5,
+			hit_sound_url: 'sounds/explode.wav',
+			velocity_initial: 10
 		},
 		firerate: 10,
 		spread: 3,
+		
 		fire_sound_url:'sounds/shoot.wav',
 		
 		id: 0
@@ -68,7 +70,8 @@ entity_data = [
 			lifetime: 200,
 			animate_with_lifetime: true,
 			scale: 10
-		}
+		},
+		shield_regen_rate: 250
 	}
 ],
 faction_data = [
@@ -124,6 +127,8 @@ GSS = {
 	renderer: null,
 	camera: null,
 	camera_target_position: {x: 0, y:0},
+	hp_bar_texture: new THREE.MeshBasicMaterial({color: 0x00ff00}),
+	shield_bar_texture: new THREE.MeshBasicMaterial({color: 0x0000ff}),
 	// Functions
 	/**
 	* Init
