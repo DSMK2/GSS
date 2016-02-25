@@ -23,10 +23,10 @@ var weapon_data = [
 			},
 			damage: 5,
 			hit_sound_url: 'sounds/explode.wav',
-			velocity_initial: 10
+			velocity_initial: 1
 		},
-		firerate: 10,
-		spread: 3,
+		firerate: 50,
+		//spread: 3,
 		
 		fire_sound_url:'sounds/shoot.wav',
 		

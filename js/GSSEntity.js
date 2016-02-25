@@ -1,3 +1,187 @@
+GSSBaseUpdateFunctions = {
+	updatePlayer: function(entity){
+		
+		var
+		// Control flags
+		left = false,
+		right = false,
+		up = false,
+		down = false,
+		fire = false,
+		
+		// Linear movement
+		x = 0,
+		y = 0,
+		x_force,
+		y_force,
+		move_angle = 0,
+		
+		// Angle movement
+		move_mouse_x = -(GSS.mouse_info.x-GSS.canvas.clientWidth/2)/GSS.PTM,
+		move_mouse_y = (GSS.mouse_info.y-GSS.canvas.clientHeight/2)/GSS.PTM,
+		offset_mouse_x = (GSS.mouse_info.x-GSS.canvas.clientWidth/2+GSS.camera.position.x)/GSS.PTM,
+		offset_mouse_y = -(GSS.mouse_info.y-GSS.canvas.clientHeight/2-GSS.camera.position.y)/GSS.PTM,
+		angle_current = entity.entity_body.GetAngle(),
+		angle_target = entity.getAngleToPosition(offset_mouse_x, offset_mouse_y),
+		move_target = Math.atan2(move_mouse_y, move_mouse_x),
+		angle_delta,
+		dir,
+		angular_acceleration_needed,
+		torque,
+		deceleration_thrust = false;
+		
+		entity.angular_velocity_current = entity.entity_body.GetAngularVelocity();
+		entity.velocity_current = entity.entity_body.GetLinearVelocity();
+		
+		// BEGIN: Linear Movement
+		// Up/Down
+		if(GSS.keys[87] === true) // Down
+			up = true;
+		else if(GSS.keys[83] === true) // Up
+			down = true;
+		
+		// Left/Right
+		if(GSS.keys[65] === true) // Left
+			left = true;
+		else if(GSS.keys[68] === true) // Right
+			right = true;
+		
+		entity.firing = GSS.keys[32];
+		
+		if(up)
+		{
+			if(left)
+				move_angle = entity.movement_relative_to_screen ? 135*DEGTORAD : angle_target-135*DEGTORAD;
+			else if(right)
+				move_angle = entity.movement_relative_to_screen ? 45*DEGTORAD : angle_target+135*DEGTORAD;
+			else 
+				move_angle = entity.movement_relative_to_screen ? 90*DEGTORAD : angle_target+180*DEGTORAD;
+		}
+		else if(down)
+		{
+			if(left)
+				move_angle = entity.movement_relative_to_screen ? 225*DEGTORAD : angle_target-45*DEGTORAD;
+			else if(right)
+				move_angle = entity.movement_relative_to_screen ? 315*DEGTORAD : angle_target+45*DEGTORAD;
+			else
+				move_angle = entity.movement_relative_to_screen ? 270*DEGTORAD : angle_target;
+		} 
+		else
+		{
+			if(left)
+				move_angle = entity.movement_relative_to_screen ? 180*DEGTORAD : angle_target-90*DEGTORAD;
+			else if(right)
+				move_angle = entity.movement_relative_to_screen ? 0*DEGTORAD : angle_target+90*DEGTORAD;
+		}
+		
+		if(entity.firing)
+			entity.fireWeapons();
+		
+		//move_angle = angle_current-move_angle*DEGTORAD;
+		//console.log(move_angle*RADTODEG);
+		x = (up || down || left || right)*entity.thrust_acceleration*Math.cos(move_angle)/GSS.FPS;
+		y = (up || down || left || right)*entity.thrust_acceleration*Math.sin(move_angle)/GSS.FPS;
+		
+		// Apply thrust any controls
+		if(up || down || left || right)
+			entity.entity_body.ApplyForceToCenter(new b2Vec2(x, y), true);
+		
+		// Set to max velocity if applied force exceeds max velocity
+		if(Math.abs(entity.velocity_current.Length()) >= entity.velocity_magnitude_max)
+		{
+			var new_vec = new b2Vec2(0, 0);
+			b2Vec2.Normalize(new_vec, entity.entity_body.GetLinearVelocity());
+			b2Vec2.MulScalar(new_vec, new_vec, entity.velocity_magnitude_max);
+			entity.entity_body.SetLinearVelocity(new_vec);
+		}
+		
+		//console.log(entity.velocity_current.Length(), x, y);
+		
+		deceleration_thrust = new b2Vec2(0,0);
+		b2Vec2.Sub(deceleration_thrust, entity.entity_body.GetLinearVelocity(), new b2Vec2(x, y));
+		x_force = entity.entity_body.GetMass()*deceleration_thrust.x;
+		y_force = entity.entity_body.GetMass()*deceleration_thrust.y;
+		x_force = Math.abs(x_force) >= entity.thrust_deceleration ? entity.thrust_deceleration*(x_force > 0 ? -1 : 1): -x_force;
+		y_force = Math.abs(y_force) >= entity.thrust_deceleration ? entity.thrust_deceleration*(y_force > 0 ? -1 : 1): -y_force;
+		entity.entity_body.ApplyForceToCenter(new b2Vec2(x_force, y_force), true);
+		
+		// END: Linear Movement
+		
+		// BEGIN: Angular Movement (Mouse Tracking)
+		// See: http://www.iforce2d.net/b2dtut/rotate-to-angle
+		// See: http://www.dummies.com/how-to/content/how-to-calculate-the-torque-needed-to-accelerate-a.html
+		if(!entity.lock_rotation)
+		{			
+			if(entity.follow_mouse)
+			{
+				entity.entity_body.SetTransform(entity.entity_body.GetPosition(), angle_target);
+			}
+			else
+			{
+				// Constrain body's current angle to 0 - 360
+				if(angle_current > 2*Math.PI)
+					entity.entity_body.SetTransform(entity.entity_body.GetPosition(), angle_current-2*Math.PI);
+				
+				// Get direction rotation is going to happen
+				dir = Math.cos(angle_current)*Math.sin(angle_target)-Math.sin(angle_current)*Math.cos(angle_target) > 0 ? 1 : -1;
+				
+				// Offset angle target to match direction i.e. if the direction is possitive and the current angle is 360, the destination is 360 plus
+				angle_target = dir > 0 && angle_target < angle_current ? angle_target+=2*Math.PI : angle_target;
+				
+				// Find amount of rotation
+				angle_delta = angle_target-angle_current;
+				
+				// Find shortest angle to rotate to 
+				while(angle_delta < -Math.PI) { angle_delta += 360*Math.PI/180; }
+				while(angle_delta > Math.PI) { angle_delta -= 360*Math.PI/180; }
+				
+				// Find acceleration for a step needed to move angle_delta
+				angular_acceleration_needed = ((angle_delta-entity.angular_velocity_current)/GSS.FPS).clamp(-entity.angular_acceleration, entity.angular_acceleration);
+
+				torque = entity.entity_body.GetInertia()*angular_acceleration_needed;
+				entity.entity_body.ApplyTorque(torque);
+				
+				// Cap angular velocity
+				entity.angular_velocity_current = entity.entity_body.GetAngularVelocity();
+				if(Math.abs(entity.angular_velocity_current) > entity.angular_velocity_max)
+					entity.entity_body.SetAngularVelocity(dir*entity.angular_velocity_max);
+			}
+			entity.angle_current = angle_current;
+		}
+		else
+		{
+			entity.entity_body.SetTransform(entity.entity_body.GetPosition(), entity.angle_current);
+		}
+		// END: Angular Movement (Mouse Tracking)
+	},
+	updateStatic: function(entity){
+		var deceleration_thrust,
+		x_force,
+		y_force,
+		angular_acceleration_needed,
+		torque;
+		
+		deceleration_thrust = new b2Vec2(0,0);
+		b2Vec2.Sub(deceleration_thrust, entity.entity_body.GetLinearVelocity(), new b2Vec2(0, 0));
+		x_force = entity.entity_body.GetMass()*deceleration_thrust.x;
+		y_force = entity.entity_body.GetMass()*deceleration_thrust.y;
+		x_force = Math.abs(x_force) >= entity.thrust_deceleration ? entity.thrust_deceleration*(x_force > 0 ? -1 : 1): -x_force;
+		y_force = Math.abs(y_force) >= entity.thrust_deceleration ? entity.thrust_deceleration*(y_force > 0 ? -1 : 1): -y_force;
+		entity.entity_body.ApplyForceToCenter(new b2Vec2(x_force, y_force), true);
+		
+		angular_acceleration_needed = (-entity.angular_velocity_current/entity.angular_acceleration/GSS.FPS).clamp(-entity.angular_acceleration, entity.angular_acceleration);
+		torque = entity.entity_body.GetInertia()*angular_acceleration_needed;
+				entity.entity_body.ApplyTorque(torque);
+				
+		// Cap angular velocity
+		entity.angular_velocity_current = entity.entity_body.GetAngularVelocity();
+		if(Math.abs(entity.angular_velocity_current) > entity.angular_velocity_max)
+			entity.entity_body.SetAngularVelocity(entity.angular_velocity_current/entity.angular_velocity_current*entity.angular_velocity_max);
+	},
+	updateStaticLookAtAggressive: function(entity){
+	}
+}
+
 GSSEntity.defaults = {
 	x: 0,
 	y: 0,
@@ -5,15 +189,25 @@ GSSEntity.defaults = {
 	is_player: false,
 	faction_id: -1,
 	
+	/* Image handling */
+	image_index: 0,
+	image_frames: 1,
+	image_frame_rate: 0,
+	animate_on_fire: false,
+	body_image_data: false,
+	image_data: false,
+	
+	/* Life and death */
 	invincible: false,
 	hp_max: 100, 
 	shield_max: 100,
 	shield_regen_rate: 1000,
 	shield_regen_amount: 1,
 	shield_regen_delay: 1000,
-	
 	death_sound_index: -1,
 	death_effect_data: false,
+	onDeathCallback: false,
+	
 	// Weapons data
 	/*
 	Example: {x: 0, y: 0, weapon: <GSSWeapon>, group: 0} and so on
@@ -21,8 +215,6 @@ GSSEntity.defaults = {
 	weapons: [],
 	power_max: 100,
 	power_regen: 10,
-	
-	onDeathCallback: false,
 	
 	triangles: [],
 	
@@ -37,12 +229,10 @@ GSSEntity.defaults = {
 	angular_velocity_max: 360,
 	lock_rotation: false,
 	follow_mouse: false,  // No acceleration 1:1 mouse tracking
-	image_index: 0,
-	image_frames: 1,
-	image_frame_rate: 0,
-	animate_on_fire: false,
-	body_image_data: false,
-	image_data: false
+	
+	updateFunction: false
+	
+	
 }
 
 GSSEntity.id = 0;
@@ -103,6 +293,7 @@ function GSSEntity(index, options) {
 			this.weapons[w].weapon = new GSSWeapon(this, weapon_data);
 	}
 
+	this.firing = false;
 	this.power_max = options.power_max;
 	this.power_current = this.power_max;
 	this.power_regen = options.power_regen;
@@ -180,6 +371,8 @@ function GSSEntity(index, options) {
 	this.entity_body.GSSData = {type: 'GSSEntity', obj: this};
 	console.log('this', -GSS.faction_data[options.faction_id].category);
 	// END: liquidfun
+	
+	this.updateFunction = options.updateFunction;
 	
 	this.id = GSSEntity.id++;
 	return this;
@@ -259,6 +452,8 @@ GSSEntity.prototype = {
 		this.mark_for_delete = true;
 		
 		GSS.scene.remove(this.mesh_plane);
+		GSS.scene.remove(this.display_hp_mesh);
+		GSS.scene.remove(this.display_shield_mesh);
 		GSS.world.DestroyBody(this.entity_body);
 		GSS.entities_to_remove.push(this);
 		if(with_effect !== undefined && with_effect)
@@ -284,6 +479,15 @@ GSSEntity.prototype = {
 			return;
 		}
 		
+		// Put movement callback here
+		if(this.is_player)
+			GSSBaseUpdateFunctions.updatePlayer(this);
+		else if(this.updateFunction != false)
+			this.updateFunction(this);
+		else
+			GSSBaseUpdateFunctions.updateStatic(this);
+			
+		/*
 		var
 		// Control flags
 		left = false,
@@ -436,7 +640,6 @@ GSSEntity.prototype = {
 			}
 			else
 			{
-				//console.log('hit');
 				this.entity_body.SetTransform(this.entity_body.GetPosition(), this.angle_current);
 			}
 			// END: Angular Movement (Mouse Tracking)
@@ -462,7 +665,7 @@ GSSEntity.prototype = {
 				this.entity_body.SetAngularVelocity(this.angular_velocity_current/this.angular_velocity_current*this.angular_velocity_max);
 				
 		}
-		
+		*/
 		// Shield regeneration
 		if(this.shield < this.shield_max && !this.shield_depleted && Date.now() >= this.shield_regen_next)
 		{
@@ -492,18 +695,18 @@ GSSEntity.prototype = {
 			this.mesh_plane.material.map.offset.x = this.frame_current/this.body_image_data.frames;
 			this.frame_next = Date.now()+this.body_image_data.frame_rate;
 		}
-		else if(Date.now() >= this.frame_next && this.body_image_data.animate_on_fire && fire)
+		else if(Date.now() >= this.frame_next && this.body_image_data.animate_on_fire && this.firing)
 		{
 			this.frame_current  = this.frame_current == this.body_image_data.frames-1 ? 0 : this.frame_current+1;
 			this.mesh_plane.material.map.offset.x = this.frame_current/this.body_image_data.frames;
 			this.frame_next = Date.now()+this.body_image_data.frame_rate;
 		}
-		else if(this.body_image_data.animate_on_fire && !fire)
+		else if(this.body_image_data.animate_on_fire && !this.firing)
 		{
 			this.frame_current = 0;
 			this.mesh_plane.material.map.offset.x = 1-(this.three_data.width*(1/(0+1)))/this.three_data.width;
 		}
-		
+
 		// Damage effect "recovery"
 		if(this.material.color.getHex() != 0xffffff && Date.now() > this.damage_next)
 		{
