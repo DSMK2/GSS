@@ -72,7 +72,24 @@ entity_data = [
 			scale: 10
 		},
 		shield_regen_rate: 250
-	}
+	},
+	{
+		image_data: {
+			url: 'images/simplefighter.png', 
+			frames: 2, 
+			frame_rate: 100, 
+			animate_on_fire: true
+		}, 
+		angle: 90, 
+		angular_velocity_max: 180, 
+		angular_acceleration: 45, 
+		thrust_acceleration: 1, 
+		thrust_deceleration: 25, 
+		velocity_magnitude_max: 10, 
+		weapons:[{x: -21, y: 0, weapon_id: 0}],
+		updateFunction: GSSBaseUpdateFunctions.updateStaticLookAtAggressive
+		
+	},
 ],
 faction_data = [
 	{faction: 'player'},
@@ -257,7 +274,7 @@ GSS = {
 				console.log('All assets loaded: Showing player');
 				window.player = GSS.addEntity(0, 0, {is_player: true});
 				
-				window.target = GSS.addEntity(1, 1, {x: 0, y: -100});
+				window.target = GSS.addEntity(1, 2, {x: 0, y: -100});
 			});
 			
 			// Load assets
@@ -537,7 +554,7 @@ GSS = {
 		
 		if(GSS.flag_follow_player && (GSS.player !== undefined && GSS.player))
 		{	
-			var vel = GSS.player.entity_body.GetLinearVelocity(),
+			var vel = GSS.player.body.GetLinearVelocity(),
 			vel_x = vel.x*GSS.PTM,
 			vel_y = vel.y*GSS.PTM,
 			perpend_vel = new b2Vec2(-vel.y, vel.x);

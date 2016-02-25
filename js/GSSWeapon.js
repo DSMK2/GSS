@@ -8,14 +8,14 @@ GSSProjectile.defaults = {
 	angle: 0, 
 	x: 0, 
 	y: 0, 
-	thrust_acceleration: -1,
+	thrust_acceleration: 1,
 	thrust_deceleration: -1,
-	velocity_max: 50,
-	velocity_initial: 50,
+	velocity_max: 30,
+	velocity_initial: 0,
 	velocity_inherit: true,
 	homing: false, 
 	homing_radius: 0, 
-	lifetime: 1000,
+	lifetime: 10000,
 	hit_effect_data: false,
 	hit_sound_index: -1,
 	image_frames : 1,
@@ -52,7 +52,7 @@ function GSSProjectile(GSSEntity_parent, options) {
 	// Important look at this later.
 	
 	this.velocity_initial = new b2Vec2(-options.velocity_initial*Math.cos(options.angle), -options.velocity_initial*Math.sin(options.angle));
-	var offset_velocity = this.parent.entity_body.GetLinearVelocity();
+	var offset_velocity = this.parent.body.GetLinearVelocity();
 	var scalar = (this.velocity_initial.x*offset_velocity.x+this.velocity_initial.y*offset_velocity.y)/Math.pow(this.velocity_initial.Length(), 2);
 	b2Vec2.MulScalar(offset_velocity, this.velocity_initial, scalar < 0 ? 0 : scalar);
 	
@@ -60,8 +60,8 @@ function GSSProjectile(GSSEntity_parent, options) {
 
 	
 	// Immediately set velocity if thrust.acceleration is -1
-	if(this.thrust_acceleration == -1)
-		this.velocity = offset_velocity;
+	//if(this.thrust_acceleration == -1)
+	this.velocity = offset_velocity;
 	
 	
 	this.id = GSSProjectile.id;
@@ -89,7 +89,7 @@ function GSSProjectile(GSSEntity_parent, options) {
 	this.projectile_body_def.type = b2_dynamicBody;
 	this.projectile_body_def.bullet = true;
 	 
-	this.projectile_body_def.position = new b2Vec2(options.x+(options.offset_by_length ? this.mesh_data.width/2/GSS.PTM*Math.cos(options.angle) : 0), options.y+(options.offset_by_length ? this.mesh_data.height/2/GSS.PTM*Math.sin(options.angle) : 0));
+	this.projectile_body_def.position = new b2Vec2(options.x-(options.offset_by_length ? this.mesh_data.width/2/GSS.PTM*Math.cos(options.angle) : 0), options.y-(options.offset_by_length ? this.mesh_data.height/2/GSS.PTM*Math.sin(options.angle) : 0));
 	this.projectile_body_def.angle = options.angle;
 	
 	this.projectile_fixture_def = new b2FixtureDef();
@@ -124,15 +124,16 @@ GSSProjectile.prototype = {
 		}
 		var velocity_current = this.projectile_body.GetLinearVelocity(),
 		angle_current = this.projectile_body.GetAngle(),
-		x_force = -this.thrust_acceleration*Math.cos(angle_current)/GSS.FPS,
-		y_force = -this.thrust_acceleration*Math.sin(angle_current)/GSS.FPS;
+		x_force = -this.thrust_acceleration*Math.cos(angle_current);
+		y_force = -this.thrust_acceleration*Math.sin(angle_current);
 		//console.log(velocity_current.length, this.homing, x_force, y_force);
 		window.velocity = velocity_current;
+		console
 		if(!this.homing)
 		{
 			if(this.thrust_acceleration != -1 && velocity_current.Length() < this.velocity_max)
 			{
-				console.log(x_force, y_force);
+				//console.log(x_force, y_force);
 				this.projectile_body.ApplyForceToCenter(new b2Vec2(x_force, y_force), true);
 			}
 			else
@@ -196,12 +197,12 @@ GSSWeapon.defaults = {
 	power_cost: 0,
 	firerate: 20,
 	faction_id: -1,
-	spread_oscilliate: false,
-	spread_oscilliate_reverse: true,
-	spread_oscilliate_reverse_on_complete: true,
-	spread: 0,
+	spread_oscilliate: true,
+	spread_oscilliate_reverse: false,
+	spread_oscilliate_reverse_on_complete: false,
+	spread: 45,
 	spread_fixed: false, // Fixed weapon spread flag, random spread otherwise
-	projectiles_per_shot: 1,
+	projectiles_per_shot: 15,
 	flipped: false,
 	
 	// Projectile data
