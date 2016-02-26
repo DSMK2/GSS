@@ -193,7 +193,7 @@ GSS = {
 			/* Init Liquidfun */
 			GSS.PTM = 12;
 			GSS.world = world = new b2World(new b2Vec2(0, 0));
-			
+		
 			// Collision handling
 			GSS.world.SetContactListener({
 				BeginContactBody: function(contact) {
@@ -772,6 +772,23 @@ GSS = {
 			source.connect(panner);
 			source.start(0);	
 		}
+	},
+	queryAABB: function(top, left, right, bottom)
+	{
+		var AABB = new b2AABB(),
+		results = [];
+		
+		AABB.lowerBound = new b2Vec2(top, left);
+		AABB.upperBound = new b2Vec2(right, bottom);
+		GSS.world.QueryAABB({
+			ReportFixture: function(asdf)
+			{
+				results.push(asdf);
+				console.info(results.length);
+				return true;
+			}
+		}, AABB);	
+		return results;
 	}
 };
 

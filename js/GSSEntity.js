@@ -118,33 +118,7 @@ GSSBaseUpdateFunctions = {
 			}
 			else
 			{
-				// Constrain body's current angle to 0 - 360
-				if(angle_current > 2*Math.PI)
-					entity.body.SetTransform(entity.body.GetPosition(), angle_current-2*Math.PI);
-				
-				// Get direction rotation is going to happen
-				dir = Math.cos(angle_current)*Math.sin(angle_target)-Math.sin(angle_current)*Math.cos(angle_target) > 0 ? 1 : -1;
-				
-				// Offset angle target to match direction i.e. if the direction is possitive and the current angle is 360, the destination is 360 plus
-				angle_target = dir > 0 && angle_target < angle_current ? angle_target+=2*Math.PI : angle_target;
-				
-				// Find amount of rotation
-				angle_delta = angle_target-angle_current;
-				
-				// Find shortest angle to rotate to 
-				while(angle_delta < -Math.PI) { angle_delta += 360*Math.PI/180; }
-				while(angle_delta > Math.PI) { angle_delta -= 360*Math.PI/180; }
-				
-				// Find acceleration for a step needed to move angle_delta
-				angular_acceleration_needed = ((angle_delta-entity.angular_velocity_current)/GSS.FPS).clamp(-entity.angular_acceleration, entity.angular_acceleration);
-
-				torque = entity.body.GetInertia()*angular_acceleration_needed;
-				entity.body.ApplyTorque(torque);
-				
-				// Cap angular velocity
-				entity.angular_velocity_current = entity.body.GetAngularVelocity();
-				if(Math.abs(entity.angular_velocity_current) > entity.angular_velocity_max)
-					entity.body.SetAngularVelocity(dir*entity.angular_velocity_max);
+				entity.lookAtPosition(offset_mouse_x, offset_mouse_y);
 			}
 			entity.angle_current = angle_current;
 		}
@@ -187,7 +161,8 @@ GSSBaseUpdateFunctions = {
 		x_force,
 		y_force,
 		angular_acceleration_needed,
-		torque;
+		torque,
+		targets = GSS.queryAABB(entity.body.position.x-100, entity.body.position.y-100, entity.body.position.x+100, entity.body.position.y+100);
 		
 		deceleration_thrust = new b2Vec2(0,0);
 		b2Vec2.Sub(deceleration_thrust, entity.body.GetLinearVelocity(), new b2Vec2(0, 0));
@@ -197,39 +172,36 @@ GSSBaseUpdateFunctions = {
 		y_force = Math.abs(y_force) >= entity.thrust_deceleration ? entity.thrust_deceleration*(y_force > 0 ? -1 : 1): -y_force;
 		entity.body.ApplyForceToCenter(new b2Vec2(x_force, y_force), true);
 		
-		if(target !== undefined && target)
+		if(targets.length !== 0)
 		{
+			var closest_target = false,
+			distance = 0,
+			current_distance;
+			for(var i = 0; i < targets.length; i++)
+			{
+				if(targets[i].GSSData === undefined)
+				{
+					targets.splice(i--, 1);
+					continue;
+				}
+				else if(targets[i].GSSData !== undefined && target.GSSData.obj == entity)
+					continue;
+				
+				target = targets[i].GSSData.obj;
+				
+				current_distance = Math.sqrt(Math.pow(entity.position.x-target.position.x, 2) + Math.pow(entity.position.y-target.position.y, 2));
+				if(closest_target == false)
+					closest_target = target;
+				else if(distance > current_distance)
+					closest_target = target;
+			}
+			/*
 			position = target.body.GetPosition();
 			angle_target = entity.getAngleToPosition(position.x, position.y);
 			
-			// Constrain body's current angle to 0 - 360
-			if(angle_current > 2*Math.PI)
-				entity.body.SetTransform(entity.body.GetPosition(), angle_current-2*Math.PI);
-			
-			// Get direction rotation is going to happen
-			dir = Math.cos(angle_current)*Math.sin(angle_target)-Math.sin(angle_current)*Math.cos(angle_target) > 0 ? 1 : -1;
-			
-			// Offset angle target to match direction i.e. if the direction is possitive and the current angle is 360, the destination is 360 plus
-			angle_target = dir > 0 && angle_target < angle_current ? angle_target+=2*Math.PI : angle_target;
-			
-			// Find amount of rotation
-			angle_delta = angle_target-angle_current;
-			
-			// Find shortest angle to rotate to 
-			while(angle_delta < -Math.PI) { angle_delta += 360*Math.PI/180; }
-			while(angle_delta > Math.PI) { angle_delta -= 360*Math.PI/180; }
-			
-			// Find acceleration for a step needed to move angle_delta
-			angular_acceleration_needed = ((angle_delta-entity.angular_velocity_current)/GSS.FPS).clamp(-entity.angular_acceleration, entity.angular_acceleration);
-
-			torque = entity.body.GetInertia()*angular_acceleration_needed;
-			entity.body.ApplyTorque(torque);
-			
-			// Cap angular velocity
-			entity.angular_velocity_current = entity.body.GetAngularVelocity();
-			if(Math.abs(entity.angular_velocity_current) > entity.angular_velocity_max)
-				entity.body.SetAngularVelocity(dir*entity.angular_velocity_max);
-		}
+			entity.lookAtPosition(position.x, position.y);
+			*/
+		}	
 	}
 }
 
@@ -349,6 +321,7 @@ function GSSEntity(index, options) {
 	this.power_current = this.power_max;
 	this.power_regen = options.power_regen;
 	this.movement_relative_to_screen = options.movement_relative_to_screen;
+	this.targets = [];
 	// END: GSSEntity Data
 	
 	// BEGIN: Movement stats
@@ -456,6 +429,45 @@ GSSEntity.prototype = {
 		angle = angle < 0 ? angle+(2*Math.PI) : angle;
 		
 		return angle;
+	},
+	/* Call this in the update function of the GSS entity */
+	lookAtPosition: function(x, y)
+	{
+		var
+		angle_current = this.body.GetAngle(),
+		angle_target = this.getAngleToPosition(x, y),
+		dir = 0, 
+		angle_delta = 0,
+		angular_acceleration_needed = 0,
+		torque = 0;
+		
+		// Constrain body's current angle to 0 - 360
+		if(angle_current > 2*Math.PI)
+			this.body.SetTransform(this.body.GetPosition(), angle_current-2*Math.PI);
+		
+		// Get direction rotation is going to happen
+		dir = Math.cos(angle_current)*Math.sin(angle_target)-Math.sin(angle_current)*Math.cos(angle_target) > 0 ? 1 : -1;
+		
+		// Offset angle target to match direction i.e. if the direction is possitive and the current angle is 360, the destination is 360 plus
+		angle_target = dir > 0 && angle_target < angle_current ? angle_target+=2*Math.PI : angle_target;
+		
+		// Find amount of rotation
+		angle_delta = angle_target-angle_current;
+		
+		// Find shortest angle to rotate to 
+		while(angle_delta < -Math.PI) { angle_delta += 360*Math.PI/180; }
+		while(angle_delta > Math.PI) { angle_delta -= 360*Math.PI/180; }
+		
+		// Find acceleration for a step needed to move angle_delta
+		angular_acceleration_needed = ((angle_delta-this.angular_velocity_current)/GSS.FPS).clamp(-this.angular_acceleration, this.angular_acceleration);
+
+		torque = this.body.GetInertia()*angular_acceleration_needed;
+		this.body.ApplyTorque(torque);
+		
+		// Cap angular velocity
+		this.angular_velocity_current = this.body.GetAngularVelocity();
+		if(Math.abs(this.angular_velocity_current) > this.angular_velocity_max)
+			this.body.SetAngularVelocity(dir*this.angular_velocity_max);
 	},
 	damage: function(damage){
 		if(damage === undefined || !damage || damage <= 0 || this.invincible)
