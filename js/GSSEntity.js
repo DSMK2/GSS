@@ -1,6 +1,5 @@
 GSSBaseUpdateFunctions = {
-	updatePlayer: function(entity){
-		
+	updatePlayer: function(entity){	
 		var
 		// Control flags
 		left = false,
@@ -162,7 +161,8 @@ GSSBaseUpdateFunctions = {
 		y_force,
 		angular_acceleration_needed,
 		torque,
-		targets = GSS.queryAABB(entity.body.position.x-100, entity.body.position.y-100, entity.body.position.x+100, entity.body.position.y+100);
+		position = entity.body.GetPosition(),
+		targets = GSS.queryAABB(-1000, -1000, 1000, 1000);
 		
 		deceleration_thrust = new b2Vec2(0,0);
 		b2Vec2.Sub(deceleration_thrust, entity.body.GetLinearVelocity(), new b2Vec2(0, 0));
@@ -172,36 +172,52 @@ GSSBaseUpdateFunctions = {
 		y_force = Math.abs(y_force) >= entity.thrust_deceleration ? entity.thrust_deceleration*(y_force > 0 ? -1 : 1): -y_force;
 		entity.body.ApplyForceToCenter(new b2Vec2(x_force, y_force), true);
 		
-		if(targets.length !== 0)
+		if(targets.length > 0)
 		{
 			var closest_target = false,
 			distance = 0,
-			current_distance;
+			current_distance = 0,
+			target_position;
 			for(var i = 0; i < targets.length; i++)
 			{
-				if(targets[i].GSSData === undefined)
-				{
-					targets.splice(i--, 1);
+				if(targets[i].body.GSSData === undefined)
 					continue;
-				}
-				else if(targets[i].GSSData !== undefined && target.GSSData.obj == entity)
+				else if(targets[i].body.GSSData !== undefined && !(targets[i].body.GSSData.obj instanceof GSSEntity))
+					continue;
+				if(!(targets[i].body.GSSData.obj instanceof GSSEntity))
+					continue;
+				if(targets[i].body.GSSData.obj.faction == entity.faction)
+					continue;
+				if(targets[i].body.GSSData.obj.id == entity.id)
 					continue;
 				
-				target = targets[i].GSSData.obj;
-				
-				current_distance = Math.sqrt(Math.pow(entity.position.x-target.position.x, 2) + Math.pow(entity.position.y-target.position.y, 2));
+				target = targets[i].body.GSSData.obj;
+				target_position = target.body.GetPosition();
+
+				current_distance = Math.sqrt(Math.pow(entity.body.GetPosition().x-target_position.x, 2) + Math.pow(entity.body.GetPosition().y-target_position.y, 2));
 				if(closest_target == false)
+				{
 					closest_target = target;
+					distance = current_distance;
+				}
 				else if(distance > current_distance)
 					closest_target = target;
+
+				entity.lookAtPosition(target_position.x, target_position.y); 
 			}
-			/*
-			position = target.body.GetPosition();
-			angle_target = entity.getAngleToPosition(position.x, position.y);
-			
-			entity.lookAtPosition(position.x, position.y);
-			*/
-		}	
+		}
+		else
+		{
+			angular_acceleration_needed = (-entity.angular_velocity_current/entity.angular_acceleration/GSS.FPS).clamp(-entity.angular_acceleration, entity.angular_acceleration);
+			torque = entity.body.GetInertia()*angular_acceleration_needed;
+					entity.body.ApplyTorque(torque);
+				
+			// Cap angular velocity
+			entity.angular_velocity_current = entity.body.GetAngularVelocity();
+			if(Math.abs(entity.angular_velocity_current) > entity.angular_velocity_max)
+			entity.body.SetAngularVelocity(entity.angular_velocity_current/entity.angular_velocity_current*entity.angular_velocity_max);
+		}
+		
 	}
 }
 

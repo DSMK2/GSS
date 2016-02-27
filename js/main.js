@@ -784,7 +784,6 @@ GSS = {
 			ReportFixture: function(asdf)
 			{
 				results.push(asdf);
-				console.info(results.length);
 				return true;
 			}
 		}, AABB);	
