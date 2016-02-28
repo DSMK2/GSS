@@ -73,9 +73,6 @@ GSSBaseUpdateFunctions = {
 				move_angle = entity.movement_relative_to_screen ? 0*DEGTORAD : angle_target+90*DEGTORAD;
 		}
 		
-		if(entity.firing)
-			entity.fireWeapons();
-		
 		//move_angle = angle_current-move_angle*DEGTORAD;
 		//console.log(move_angle*RADTODEG);
 		x = (up || down || left || right)*entity.thrust_acceleration*Math.cos(move_angle)/GSS.FPS;
@@ -162,7 +159,8 @@ GSSBaseUpdateFunctions = {
 		angular_acceleration_needed,
 		torque,
 		position = entity.body.GetPosition(),
-		targets = GSS.queryAABB(-1000, -1000, 1000, 1000);
+		targets = GSS.queryAABB(-1000, -1000, 1000, 1000),
+		no_target = true;
 		
 		deceleration_thrust = new b2Vec2(0,0);
 		b2Vec2.Sub(deceleration_thrust, entity.body.GetLinearVelocity(), new b2Vec2(0, 0));
@@ -206,17 +204,47 @@ GSSBaseUpdateFunctions = {
 				
 					
 				target_position = closest_target.body.GetPosition();
-				var test = GSS.queryRayCast(entity.body.GetPosition(), target_position, entity);
-				entity.lookAtPosition(target_position.x, target_position.y); 
-				//console.log(test);
+				var test = GSS.queryRayCast(entity.body.GetPosition(), {
+					point_to: target_position,
+					ignores_projectiles: true,
+					ignore_entity: [entity]
+				});
 				if(test.length == 1)
 				{
-				
-					entity.fireWeapons();
+					if(test[0].body.GSSData !== undefined)
+						if(test[0].body.GSSData.obj == closest_target)
+						{
+							no_target = false;
+							entity.lookAtPosition(target_position.x, target_position.y); 
+						}
+				}
+				test = GSS.queryRayCast(entity.body.GetPosition(), {
+					angle: entity.body.GetAngle(),
+					distance: 1000,
+					ignores_projectiles: true,
+					ignore_entity: [entity]
+				});
+				console.log('test:', test);
+				if(test.length == 1)
+				{
+					if(test[0].body.GSSData !== undefined)
+						if(test[0].body.GSSData.obj == closest_target)
+						{
+							entity.firing = true;
+						}
+						else
+						{
+							entity.firing = false;
+						}
+				}
+				else
+				{
+					entity.firing = false;
 				}
 			}
 		}
-		else
+		
+		if(no_target)
 		{
 			angular_acceleration_needed = (-entity.angular_velocity_current/entity.angular_acceleration/GSS.FPS).clamp(-entity.angular_acceleration, entity.angular_acceleration);
 			torque = entity.body.GetInertia()*angular_acceleration_needed;
@@ -757,6 +785,9 @@ GSSEntity.prototype = {
 				
 		}
 		*/
+		if(this.firing)
+			this.fireWeapons();
+		
 		// Shield regeneration
 		if(this.shield < this.shield_max && !this.shield_depleted && Date.now() >= this.shield_regen_next)
 		{

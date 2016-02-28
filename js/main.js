@@ -794,16 +794,16 @@ GSS = {
 	queryRayCast: function(point_from, options)
 	{
 		var result = [],
+		sorted_results = [],
 		point_to = false,
 		x_offset,
 		y_offset,
 		defaults = {
 			point_to: false,
-			requester: false,
 			angle: false,
 			distance: false,
 			stop_on_hit: true,
-			ignore_entity: [],
+			ignore_entities: [],
 			ignores_projectiles: false,
 		};
 		
@@ -813,14 +813,13 @@ GSS = {
 		{
 			return [];
 		}
-		
-		if(requester != false
-		if(point_to != false)
+
+		if(options.point_to != false)
 			point_to = options.point_to;
-		else if(angle != false && distance != false)
+		else if(options.angle != false && options.distance != false)
 		{
-			x_offset = distance*Math.cos(angle);
-			y_offset = distance*Math.sin(angle);
+			x_offset = -options.distance*Math.cos(options.angle);
+			y_offset = -options.distance*Math.sin(options.angle);
 			point_to = new b2Vec2(point_from.x+x_offset, point_to+y_offset);
 		}
 		
@@ -829,14 +828,49 @@ GSS = {
 		{	
 			ReportFixture: function(fixture, point, normal, fraction){
 				var GSSData = fixture.body.GSSData;
-				
-				result.push(fixture);	
+				if(GSSData !== undefined)
+				{
+					if(GSSData.obj instanceof GSSEntity)
+					{
+						for(var e = 0; e < options.ignore_entities.length; e++)
+						{
+							if(options.ignore_entities[e] == GSSData.obj)
+								return -1;
+						}
+					}
+					else if (GSSData.obj instanceof GSSProjectile)
+					{
+						if(options.ignores_projectiles)
+							return -1;
+					}
+				}
+
+				result.push({fixture: fixture, point: point});	
 					
 				return options.stop_on_hit ? fraction : 1;
 				
 			}
 		}, point_from, point_to);
-		return result;
+		
+		result = result.sort(function(a, b){
+			var point_a = a.point,
+			point_b = b.point,
+			distance_a = Math.sqrt(Math.pow(point_from.x-point_a.x, 2)+Math.pow(point_from.y-point_a.y, 2)),
+			distance_b = Math.sqrt(Math.pow(point_from.x-point_b.x, 2)+Math.pow(point_from.y-point_b.y, 2));
+			
+			if(distance_a > distance_b)
+				return 1;
+			else if(distance_a < distance_b)
+				return -1;
+				
+			return 0;
+		});
+		
+		for(var r = 0; r < result.length; r++)
+		{
+			sorted_results.push(result[r].fixture);
+		}
+		return sorted_results;
 	}
 };
 
