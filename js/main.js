@@ -791,28 +791,51 @@ GSS = {
 		}, AABB);	
 		return results;
 	},
-	queryRayCast: function(point_a, point_b, requester)
+	queryRayCast: function(point_from, options)
 	{
-		var result = [];
-	
+		var result = [],
+		point_to = false,
+		x_offset,
+		y_offset,
+		defaults = {
+			point_to: false,
+			requester: false,
+			angle: false,
+			distance: false,
+			stop_on_hit: true,
+			ignore_entity: [],
+			ignores_projectiles: false,
+		};
+		
+		options = extend(defaults, options);
+		
+		if(!options.point_to && !options.requester && !options.angle && !options.distance)
+		{
+			return [];
+		}
+		
+		if(requester != false
+		if(point_to != false)
+			point_to = options.point_to;
+		else if(angle != false && distance != false)
+		{
+			x_offset = distance*Math.cos(angle);
+			y_offset = distance*Math.sin(angle);
+			point_to = new b2Vec2(point_from.x+x_offset, point_to+y_offset);
+		}
+		
+		
 		GSS.world.RayCast(
 		{	
 			ReportFixture: function(fixture, point, normal, fraction){
-				var asdf = fixture.body.GSSData;
-				
-				if(asdf !== undefined && !(asdf.obj instanceof GSSEntity))
-					return -1;
-				
-				if(requester !== undefined && asdf !== undefined && asdf.obj.type == 'GSSEntity' && asdf.obj == requester)
-					return -1;
-		
+				var GSSData = fixture.body.GSSData;
 				
 				result.push(fixture);	
 					
-				return fraction;
+				return options.stop_on_hit ? fraction : 1;
 				
 			}
-		}, point_a, point_b);
+		}, point_from, point_to);
 		return result;
 	}
 };
