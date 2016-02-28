@@ -8,14 +8,14 @@ GSSProjectile.defaults = {
 	angle: 0, 
 	x: 0, 
 	y: 0, 
-	thrust_acceleration: 1,
+	thrust_acceleration: -1,
 	thrust_deceleration: -1,
 	velocity_max: 30,
 	velocity_initial: 0,
 	velocity_inherit: true,
 	homing: false, 
 	homing_radius: 0, 
-	lifetime: 10000,
+	lifetime: 1000,
 	hit_effect_data: false,
 	hit_sound_index: -1,
 	image_frames : 1,
@@ -99,6 +99,9 @@ function GSSProjectile(GSSEntity_parent, options) {
 	this.projectile_fixture_def.friction = 1;
 	this.projectile_fixture_def.restitution = 0; // Bounce yes
 	this.projectile_fixture_def.filter.groupIndex = -GSS.faction_data[GSSEntity_parent.faction].category;
+	this.projectile_fixture_def.filter.categoryBits = 0x0008;
+	this.projectile_fixture_def.filter.maskBits = 0x0001 | 0x0002;
+	//this.projectile_fixture_def.filter.category = 0x000001;
 
 	this.projectile_body = GSS.world.CreateBody(this.projectile_body_def);
 	this.projectile_body.CreateFixtureFromDef(this.projectile_fixture_def);
@@ -197,12 +200,12 @@ GSSWeapon.defaults = {
 	power_cost: 0,
 	firerate: 20,
 	faction_id: -1,
-	spread_oscilliate: true,
+	spread_oscilliate: false,
 	spread_oscilliate_reverse: false,
 	spread_oscilliate_reverse_on_complete: false,
-	spread: 45,
+	spread: 0,
 	spread_fixed: false, // Fixed weapon spread flag, random spread otherwise
-	projectiles_per_shot: 15,
+	projectiles_per_shot: 1,
 	flipped: false,
 	
 	// Projectile data

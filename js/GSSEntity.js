@@ -202,8 +202,18 @@ GSSBaseUpdateFunctions = {
 				}
 				else if(distance > current_distance)
 					closest_target = target;
-
+					
+				
+					
+				target_position = closest_target.body.GetPosition();
+				var test = GSS.queryRayCast(entity.body.GetPosition(), target_position, entity);
 				entity.lookAtPosition(target_position.x, target_position.y); 
+				//console.log(test);
+				if(test.length == 1)
+				{
+				
+					entity.fireWeapons();
+				}
 			}
 		}
 		else
@@ -403,6 +413,7 @@ function GSSEntity(index, options) {
 	body_fixture.friction = 1;
 	body_fixture.restitution = 0;
 	body_fixture.filter.groupIndex = -GSS.faction_data[options.faction_id].category; // Same faction does not collide with each other
+	body_fixture.filter.categoryBits = 0x0002;
 	body_fixture.shape = new b2PolygonShape();
 	body_fixture.shape.SetAsBoxXY(this.three_data.width/this.body_image_data.frames/2/GSS.PTM, this.three_data.height/2/GSS.PTM);
 	
@@ -410,6 +421,7 @@ function GSSEntity(index, options) {
 	this.body.CreateFixtureFromDef(body_fixture);
 	this.body.GSSData = {type: 'GSSEntity', obj: this};
 	console.log('this', -GSS.faction_data[options.faction_id].category);
+	
 	// END: liquidfun
 	
 	this.updateFunction = options.updateFunction;

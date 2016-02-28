@@ -21,12 +21,12 @@ var weapon_data = [
 				lifetime: 200,
 				animate_with_lifetime: true
 			},
-			damage: 5,
+			damage: 1,
 			hit_sound_url: 'sounds/explode.wav',
-			velocity_initial: 1
+			velocity_initial: 10
 		},
-		firerate: 50,
-		//spread: 3,
+		firerate: 10,
+		spread: 3,
 		
 		fire_sound_url:'sounds/shoot.wav',
 		
@@ -87,7 +87,9 @@ entity_data = [
 		thrust_deceleration: 25, 
 		velocity_magnitude_max: 10, 
 		weapons:[{x: -21, y: 0, weapon_id: 0}],
-		updateFunction: GSSBaseUpdateFunctions.updateStaticLookAtAggressive
+		updateFunction: GSSBaseUpdateFunctions.updateStaticLookAtAggressive,
+		hp_max: 10,
+		shield_max: 0
 		
 	},
 ],
@@ -788,6 +790,30 @@ GSS = {
 			}
 		}, AABB);	
 		return results;
+	},
+	queryRayCast: function(point_a, point_b, requester)
+	{
+		var result = [];
+	
+		GSS.world.RayCast(
+		{	
+			ReportFixture: function(fixture, point, normal, fraction){
+				var asdf = fixture.body.GSSData;
+				
+				if(asdf !== undefined && !(asdf.obj instanceof GSSEntity))
+					return -1;
+				
+				if(requester !== undefined && asdf !== undefined && asdf.obj.type == 'GSSEntity' && asdf.obj == requester)
+					return -1;
+		
+				
+				result.push(fixture);	
+					
+				return fraction;
+				
+			}
+		}, point_a, point_b);
+		return result;
 	}
 };
 
