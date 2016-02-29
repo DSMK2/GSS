@@ -159,7 +159,7 @@ GSSBaseUpdateFunctions = {
 		angular_acceleration_needed,
 		torque,
 		position = entity.body.GetPosition(),
-		targets = GSS.queryAABB(-1000, -1000, 1000, 1000),
+		targets = GSS.queryAABB(entity.body.GetPosition().x-entity.detection_range, entity.body.GetPosition().y-entity.detection_range, entity.body.GetPosition().x+entity.detection_range, entity.body.GetPosition().y+entity.detection_range),
 		no_target = true;
 		
 		deceleration_thrust = new b2Vec2(0,0);
@@ -212,19 +212,43 @@ GSSBaseUpdateFunctions = {
 				if(test.length == 1)
 				{
 					if(test[0].body.GSSData !== undefined)
+					{
 						if(test[0].body.GSSData.obj == closest_target)
 						{
 							no_target = false;
-							entity.lookAtPosition(target_position.x, target_position.y); 
+							entity.lookAtPosition(target_position.x, target_position.y);
+							
+							// Constrain body's current angle to 0 - 360
+							angle_current = entity.body.GetAngle();
+							var angle_test = entity.getAngleToPosition(target_position.x, target_position.y),
+							angle_dif = Math.floor(angle_current*RADTODEG)-Math.floor(angle_test*RADTODEG),
+							detect_angle_min = -entity.shoot_angle/2,
+							detect_angle_max = entity.shoot_angle/2;
+							
+							//console.log(angle_test*RADTODEG, angle_dif)
+							if(angle_dif >= detect_angle_min && angle_dif <= detect_angle_max)
+								entity.firing = true;
+							else
+								entity.firing = false;							
 						}
+						else
+						{
+							entity.firing = false;
+						}	
+					}
+					else
+						entity.firing = false;
 				}
+				
+				
+				
+				/*
 				test = GSS.queryRayCast(entity.body.GetPosition(), {
 					angle: entity.body.GetAngle(),
 					distance: 1000,
 					ignores_projectiles: true,
 					ignore_entity: [entity]
 				});
-				console.log('test:', test);
 				if(test.length == 1)
 				{
 					if(test[0].body.GSSData !== undefined)
@@ -241,6 +265,7 @@ GSSBaseUpdateFunctions = {
 				{
 					entity.firing = false;
 				}
+				*/
 			}
 		}
 		
@@ -284,6 +309,10 @@ GSSEntity.defaults = {
 	death_sound_index: -1,
 	death_effect_data: false,
 	onDeathCallback: false,
+	
+	/* AI Data */
+	detection_range: 100,
+	shoot_angle: 30,
 	
 	// Weapons data
 	/*
@@ -353,6 +382,10 @@ function GSSEntity(index, options) {
 	this.shield_regen_delay_next = Date.now();
 	
 	this.death_effect_data = options.death_effect_data;
+	
+	// AI Data
+	this.detection_range = options.detection_range;
+	this.shoot_angle = options.shoot_angle;
 	
 	// Weapons handling
 	this.weapons = [];
@@ -498,9 +531,12 @@ GSSEntity.prototype = {
 		torque = 0;
 		
 		// Constrain body's current angle to 0 - 360
-		if(angle_current > 2*Math.PI)
-			this.body.SetTransform(this.body.GetPosition(), angle_current-2*Math.PI);
-		
+		/*if(Math.abs(angle_current) > 2*Math.PI)
+			this.body.SetTransform(this.body.GetPosition(), angle_current % 2*Math.PI);
+		angle_current = this.body.GetAngle();
+		if(this.is_player)
+			console.log(angle_current*180/Math.PI);
+		*/
 		// Get direction rotation is going to happen
 		dir = Math.cos(angle_current)*Math.sin(angle_target)-Math.sin(angle_current)*Math.cos(angle_target) > 0 ? 1 : -1;
 		
@@ -524,6 +560,13 @@ GSSEntity.prototype = {
 		this.angular_velocity_current = this.body.GetAngularVelocity();
 		if(Math.abs(this.angular_velocity_current) > this.angular_velocity_max)
 			this.body.SetAngularVelocity(dir*this.angular_velocity_max);
+		
+		// Constrain body's current angle to 0 - 360
+		angle_current = this.body.GetAngle();
+		this.body.SetTransform(this.body.GetPosition(),(angle_current*RADTODEG+360) % 360 * DEGTORAD);
+		
+		if(!this.is_player)
+			console.log(this.body.GetAngle()*RADTODEG);
 	},
 	damage: function(damage){
 		if(damage === undefined || !damage || damage <= 0 || this.invincible)

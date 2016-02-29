@@ -81,7 +81,7 @@ entity_data = [
 			animate_on_fire: true
 		}, 
 		angle: 90, 
-		angular_velocity_max: 180, 
+		angular_velocity_max: 30, 
 		angular_acceleration: 45, 
 		thrust_acceleration: 1, 
 		thrust_deceleration: 25, 
