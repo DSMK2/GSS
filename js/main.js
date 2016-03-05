@@ -21,9 +21,11 @@ var weapon_data = [
 				lifetime: 200,
 				animate_with_lifetime: true
 			},
-			damage: 1,
+			damage: 10,
 			hit_sound_url: 'sounds/explode.wav',
-			velocity_initial: 10
+			velocity_initial: 10,
+			acceleration: -1,
+			lifetime: 1000
 		},
 		firerate: 10,
 		spread: 3,
@@ -44,11 +46,10 @@ entity_data = [
 		angle: 90, 
 		angular_velocity_max: 180, 
 		angular_acceleration: 45, 
-		thrust_acceleration: 1, 
-		thrust_deceleration: 25, 
+		acceleration: 15, 
+		deceleration: 10, 
 		velocity_magnitude_max: 10, 
 		weapons:[{x: -21, y: 0, weapon_id: 0}]
-		
 	},
 	{
 		image_data: {
@@ -61,6 +62,8 @@ entity_data = [
 		angular_acceleration: 25, 
 		thrust_acceleration: 1, 
 		thrust_deceleration: 50, 
+		acceleration: 1, 
+		deceleration: 1, 
 		death_effect_data: {
 			image_data: {
 				url: 'images/projectile_hit.png', 
@@ -71,7 +74,8 @@ entity_data = [
 			animate_with_lifetime: true,
 			scale: 10
 		},
-		shield_regen_rate: 250
+		shield_regen_rate: 250,
+		points: 10
 	},
 	{
 		image_data: {
@@ -82,14 +86,17 @@ entity_data = [
 		}, 
 		angle: 90, 
 		angular_velocity_max: 30, 
-		angular_acceleration: 45, 
+		angular_acceleration: 180, 
 		thrust_acceleration: 1, 
 		thrust_deceleration: 25, 
+		acceleration: 1, 
+		deceleration: 1, 
 		velocity_magnitude_max: 10, 
 		weapons:[{x: -21, y: 0, weapon_id: 0}],
 		updateFunction: GSSBaseUpdateFunctions.updateStaticLookAtAggressive,
 		hp_max: 10,
-		shield_max: 0
+		shield_max: 0,
+		points: 100
 		
 	},
 ],
@@ -120,6 +127,10 @@ GSS = {
 	audio_data: [],
 	faction_data: [],
 	player: false,
+	player_data: {
+		lives: 3,
+		points: 0
+	},
 	flag_follow_player: true,
 	flag_init: false,
 	
@@ -276,7 +287,7 @@ GSS = {
 				console.log('All assets loaded: Showing player');
 				window.player = GSS.addEntity(0, 0, {is_player: true});
 				
-				window.target = GSS.addEntity(1, 2, {x: 0, y: -100});
+				//window.target = GSS.addEntity(1, 2, {x: 0, y: -100});
 			});
 			
 			// Load assets
@@ -563,9 +574,12 @@ GSS = {
 
 			b2Vec2.Normalize(perpend_vel, perpend_vel);
 			b2Vec2.MulScalar(perpend_vel, perpend_vel, -100);
-			//GSS.camera.position.x = x+GSS.player.mesh_plane.position.x;
-			//GSS.camera.position.y = y+GSS.player.mesh_plane.position.y;
-			GSS.camera.position.lerp(new THREE.Vector3(x+GSS.player.mesh_plane.position.x+vel_x, y+GSS.player.mesh_plane.position.y+vel_y, GSS.camera.position.z), 0.005);
+			GSS.camera.position.x = x+GSS.player.mesh_plane.position.x;
+			GSS.camera.position.y = y+GSS.player.mesh_plane.position.y;
+			var 
+			p_x = Math.cos(GSS.player.body.GetAngle()),
+			p_x = Math.sin(GSS.player.body.GetAngle());
+			//GSS.camera.position.lerp(new THREE.Vector3(GSS.player.mesh_plane.position.x, GSS.player.mesh_plane.position.y, GSS.camera.position.z), 0.005);
 			//GSS.camera_target_position = {x: x+GSS.player.mesh_plane.position.x, y: y+GSS.player.mesh_plane.position.y};
 		}
 		

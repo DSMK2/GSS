@@ -8,8 +8,8 @@ GSSProjectile.defaults = {
 	angle: 0, 
 	x: 0, 
 	y: 0, 
-	thrust_acceleration: -1,
-	thrust_deceleration: -1,
+	acceleration: -1,
+	deceleration: -1,
 	velocity_max: 30,
 	velocity_initial: 0,
 	velocity_inherit: true,
@@ -22,7 +22,8 @@ GSSProjectile.defaults = {
 	image_frame_rate: 100,
 	image_data: false,
 	damage: 1,
-	offset_by_length: false
+	offset_by_length: false,
+	mass: 1
 };
 
 
@@ -43,27 +44,26 @@ function GSSProjectile(GSSEntity_parent, options) {
 	this.homing = options.homing;
 	this.homing_radius = options.homing_radius;
 	
-	this.thrust_acceleration = options.thrust_acceleration;
-	this.thrust_deceleration = options.thrust_deceleration;
 	this.velocity_max = options.velocity_max;
 	this.velocity_inherit = options.velocity_inherit;
 	
 	this.damage = options.damage;
-	// Important look at this later.
-	
 	this.velocity_initial = new b2Vec2(-options.velocity_initial*Math.cos(options.angle), -options.velocity_initial*Math.sin(options.angle));
-	var offset_velocity = this.parent.body.GetLinearVelocity();
-	var scalar = (this.velocity_initial.x*offset_velocity.x+this.velocity_initial.y*offset_velocity.y)/Math.pow(this.velocity_initial.Length(), 2);
-	b2Vec2.MulScalar(offset_velocity, this.velocity_initial, scalar < 0 ? 0 : scalar);
-	
-	b2Vec2.Add(offset_velocity, offset_velocity, this.velocity_initial);
+	// Velocity projection?
+	if(options.velocity_inherit)
+	{
+		
+		var offset_velocity = this.parent.body.GetLinearVelocity();
+		var scalar = (this.velocity_initial.x*offset_velocity.x+this.velocity_initial.y*offset_velocity.y)/Math.pow(this.velocity_initial.Length(), 2);
+		b2Vec2.MulScalar(offset_velocity, this.velocity_initial, scalar < 0 ? 0 : scalar);
+		b2Vec2.Add(offset_velocity, offset_velocity, this.velocity_initial);
+		// Immediately set velocity if thrust.acceleration is -1
+		//if(this.thrust_acceleration == -1)
+		this.velocity = offset_velocity;
+	}
+	else
+		this.velocity = this.velocity_initial;
 
-	
-	// Immediately set velocity if thrust.acceleration is -1
-	//if(this.thrust_acceleration == -1)
-	this.velocity = offset_velocity;
-	
-	
 	this.id = GSSProjectile.id;
 	GSSProjectile.id++;
 	
@@ -77,6 +77,7 @@ function GSSProjectile(GSSEntity_parent, options) {
 	
 	this.texture = this.mesh_data.texture.clone();
 	this.texture.needsUpdate = true;
+	this.acceleration = options.acceleration;
 	this.material = new THREE.MeshBasicMaterial({map: this.texture, wireframe: false, transparent: true});
 	this.material.side = THREE.DoubleSide;
 	
@@ -85,12 +86,11 @@ function GSSProjectile(GSSEntity_parent, options) {
 	// END: THREE.js
 	
 	// BEGIN: LiquidFun
-	this.projectile_body_def = new b2BodyDef();
-	this.projectile_body_def.type = b2_dynamicBody;
-	this.projectile_body_def.bullet = true;
-	 
-	this.projectile_body_def.position = new b2Vec2(options.x-(options.offset_by_length ? this.mesh_data.width/2/GSS.PTM*Math.cos(options.angle) : 0), options.y-(options.offset_by_length ? this.mesh_data.height/2/GSS.PTM*Math.sin(options.angle) : 0));
-	this.projectile_body_def.angle = options.angle;
+	this.body_def = new b2BodyDef();
+	this.body_def.type = b2_dynamicBody;
+	this.body_def.bullet = true;
+	this.body_def.position = new b2Vec2(options.x-(options.offset_by_length ? this.mesh_data.width/2/GSS.PTM*Math.cos(options.angle) : 0), options.y-(options.offset_by_length ? this.mesh_data.width/2/GSS.PTM*Math.sin(options.angle) : 0));
+	this.body_def.angle = options.angle;
 	
 	this.projectile_fixture_def = new b2FixtureDef();
 	this.projectile_fixture_def.shape = new b2PolygonShape();
@@ -103,10 +103,13 @@ function GSSProjectile(GSSEntity_parent, options) {
 	this.projectile_fixture_def.filter.maskBits = 0x0001 | 0x0002;
 	//this.projectile_fixture_def.filter.category = 0x000001;
 
-	this.projectile_body = GSS.world.CreateBody(this.projectile_body_def);
-	this.projectile_body.CreateFixtureFromDef(this.projectile_fixture_def);
-	this.projectile_body.GSS_parent = GSSEntity_parent;
-	this.projectile_body.GSSData = {type: 'GSSProjectile', obj: this};
+	this.body = GSS.world.CreateBody(this.body_def);
+	this.body.CreateFixtureFromDef(this.projectile_fixture_def);
+	this.body.GSS_parent = GSSEntity_parent;
+	this.body.GSSData = {type: 'GSSProjectile', obj: this};
+	
+	this.thrust_acceleration = options.acceleration*this.body.GetMass();
+	this.thrust_deceleration = options.deceleration*this.body.GetMass();
 	// END: LiquidFun
 	
 	return this;
@@ -117,45 +120,42 @@ GSSProjectile.prototype = {
 		if(this.mark_for_delete)
 		{	
 			// Prevent any LiquidFun interactions
-			this.projectile_body.SetLinearVelocity(new b2Vec2(0,0));
-			for(var i = 0; i < this.projectile_body.fixtures.length; i++)
+			this.body.SetLinearVelocity(new b2Vec2(0,0));
+			for(var i = 0; i < this.body.fixtures.length; i++)
 			{
-				var fixture = this.projectile_body.fixtures[i];
-				this.projectile_body.DestroyFixture(fixture);
+				var fixture = this.body.fixtures[i];
+				this.body.DestroyFixture(fixture);
 			}
 			return;
 		}
-		var velocity_current = this.projectile_body.GetLinearVelocity(),
-		angle_current = this.projectile_body.GetAngle(),
-		x_force = -this.thrust_acceleration*Math.cos(angle_current);
-		y_force = -this.thrust_acceleration*Math.sin(angle_current);
-		//console.log(velocity_current.length, this.homing, x_force, y_force);
-		window.velocity = velocity_current;
-		console
+		var velocity_current = this.body.GetLinearVelocity(),
+		angle_current = this.body.GetAngle(),
+		mass = this.body.GetMass(),
+		thrust = this.acceleration*mass,
+		x_force = -thrust*Math.cos(angle_current);
+		y_force = -thrust*Math.sin(angle_current);
+
 		if(!this.homing)
 		{
-			if(this.thrust_acceleration != -1 && velocity_current.Length() < this.velocity_max)
-			{
-				//console.log(x_force, y_force);
-				this.projectile_body.ApplyForceToCenter(new b2Vec2(x_force, y_force), true);
-			}
+			if(this.acceleration != -1 && velocity_current.Length() < this.velocity_max)
+				this.body.ApplyForceToCenter(new b2Vec2(x_force, y_force), true);
 			else
-				this.projectile_body.SetLinearVelocity(this.velocity);
+				this.body.SetLinearVelocity(this.velocity);
 		}
 		
 		
 		// Update mesh position
-		this.mesh_plane.position.x = this.projectile_body.GetPosition().x*GSS.PTM;
-		this.mesh_plane.position.y = this.projectile_body.GetPosition().y*GSS.PTM;
-		this.mesh_plane.rotation.z = this.projectile_body.GetAngle();
+		this.mesh_plane.position.x = this.body.GetPosition().x*GSS.PTM;
+		this.mesh_plane.position.y = this.body.GetPosition().y*GSS.PTM;
+		this.mesh_plane.rotation.z = this.body.GetAngle();
 		
 		if(this.lifetime_end <= Date.now())
 			this.destroy();
 	},
 	redraw: function(){
-		var angle = this.projectile_body.GetAngle(),
-		x = this.projectile_body.GetPosition().x*GSS.PTM,
-		y = this.projectile_body.GetPosition().y*GSS.PTM; 
+		var angle = this.body.GetAngle(),
+		x = this.body.GetPosition().x*GSS.PTM,
+		y = this.body.GetPosition().y*GSS.PTM; 
 		
 		if(x-this.image.width/2 < 0 || y-this.image.height/2 < 0 || x-this.image.width/2 > GSS.context.canvas.width || y-this.image.height/2 > GSS.context.canvas.height)
 			return;
@@ -174,15 +174,15 @@ GSSProjectile.prototype = {
 		this.mark_for_delete = true;
 		GSS.scene.remove(this.mesh_plane);
 		
-		GSS.world.DestroyBody(this.projectile_body);
+		GSS.world.DestroyBody(this.body);
 		GSS.projectiles_to_remove.push(this);
 		
 		if(with_effect !== undefined && with_effect)
 		{
 			if(this.hit_sound_index != -1)
-				GSS.playSound(this.hit_sound_index, this.projectile_body.GetPosition().x, this.projectile_body.GetPosition().y);
+				GSS.playSound(this.hit_sound_index, this.body.GetPosition().x, this.body.GetPosition().y);
 			if(this.hit_effect_data)
-				GSS.addEffect(this.hit_effect_data, this.projectile_body.GetPosition().x*GSS.PTM, this.projectile_body.GetPosition().y*GSS.PTM);	
+				GSS.addEffect(this.hit_effect_data, this.body.GetPosition().x*GSS.PTM, this.body.GetPosition().y*GSS.PTM);	
 		}
 	}
 }
@@ -258,7 +258,12 @@ function GSSWeapon(GSSEntity_parent, options){
 	this.velocity = options.velocity;
 	this.parent = GSSEntity_parent;
 	this.projectile_data = options.projectile_data;
-	console.log(this.parent);
+	
+	/* Calculate weapon range from projectile data */
+	//var acceleration = thrust/mass
+	var pd = this.projectile_data;
+	this.range = pd.velocity_initial*(pd.lifetime/1000)+(1/2)*pd.acceleration*Math.pow(pd.lifetime/1000, 2);
+	console.log('weapon range', this.range);
 }
 
 GSSWeapon.prototype = {

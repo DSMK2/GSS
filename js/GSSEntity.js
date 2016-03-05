@@ -27,7 +27,7 @@ GSSBaseUpdateFunctions = {
 		dir,
 		angular_acceleration_needed,
 		torque,
-		deceleration_thrust = false;
+		deceleration_vector = false;
 		
 		entity.angular_velocity_current = entity.body.GetAngularVelocity();
 		entity.velocity_current = entity.body.GetLinearVelocity();
@@ -47,6 +47,7 @@ GSSBaseUpdateFunctions = {
 		
 		entity.firing = GSS.keys[32];
 		
+		// Get move_angle based on controls
 		if(up)
 		{
 			if(left)
@@ -73,10 +74,8 @@ GSSBaseUpdateFunctions = {
 				move_angle = entity.movement_relative_to_screen ? 0*DEGTORAD : angle_target+90*DEGTORAD;
 		}
 		
-		//move_angle = angle_current-move_angle*DEGTORAD;
-		//console.log(move_angle*RADTODEG);
-		x = (up || down || left || right)*entity.thrust_acceleration*Math.cos(move_angle)/GSS.FPS;
-		y = (up || down || left || right)*entity.thrust_acceleration*Math.sin(move_angle)/GSS.FPS;
+		x = (up || down || left || right)*entity.thrust_acceleration*Math.cos(move_angle);
+		y = (up || down || left || right)*entity.thrust_acceleration*Math.sin(move_angle);
 		
 		// Apply thrust any controls
 		if(up || down || left || right)
@@ -91,12 +90,11 @@ GSSBaseUpdateFunctions = {
 			entity.body.SetLinearVelocity(new_vec);
 		}
 		
-		//console.log(entity.velocity_current.Length(), x, y);
-		
-		deceleration_thrust = new b2Vec2(0,0);
-		b2Vec2.Sub(deceleration_thrust, entity.body.GetLinearVelocity(), new b2Vec2(x, y));
-		x_force = entity.body.GetMass()*deceleration_thrust.x;
-		y_force = entity.body.GetMass()*deceleration_thrust.y;
+		deceleration_vector = new b2Vec2(0,0);
+		b2Vec2.Sub(deceleration_vector, entity.body.GetLinearVelocity(), new b2Vec2(x, y));
+		// Find momentum needed
+		x_force = entity.body.GetMass()*deceleration_vector.x;
+		y_force = entity.body.GetMass()*deceleration_vector.y;
 		x_force = Math.abs(x_force) >= entity.thrust_deceleration ? entity.thrust_deceleration*(x_force > 0 ? -1 : 1): -x_force;
 		y_force = Math.abs(y_force) >= entity.thrust_deceleration ? entity.thrust_deceleration*(y_force > 0 ? -1 : 1): -y_force;
 		entity.body.ApplyForceToCenter(new b2Vec2(x_force, y_force), true);
@@ -125,16 +123,16 @@ GSSBaseUpdateFunctions = {
 		// END: Angular Movement (Mouse Tracking)
 	},
 	updateStatic: function(entity){
-		var deceleration_thrust,
+		var deceleration_vector,
 		x_force,
 		y_force,
 		angular_acceleration_needed,
 		torque;
 		
-		deceleration_thrust = new b2Vec2(0,0);
-		b2Vec2.Sub(deceleration_thrust, entity.body.GetLinearVelocity(), new b2Vec2(0, 0));
-		x_force = entity.body.GetMass()*deceleration_thrust.x;
-		y_force = entity.body.GetMass()*deceleration_thrust.y;
+		deceleration_vector = new b2Vec2(0,0);
+		b2Vec2.Sub(deceleration_vector, entity.body.GetLinearVelocity(), new b2Vec2(0, 0));
+		x_force = entity.body.GetMass()*deceleration_vector.x;
+		y_force = entity.body.GetMass()*deceleration_vector.y;
 		x_force = Math.abs(x_force) >= entity.thrust_deceleration ? entity.thrust_deceleration*(x_force > 0 ? -1 : 1): -x_force;
 		y_force = Math.abs(y_force) >= entity.thrust_deceleration ? entity.thrust_deceleration*(y_force > 0 ? -1 : 1): -y_force;
 		entity.body.ApplyForceToCenter(new b2Vec2(x_force, y_force), true);
@@ -153,7 +151,7 @@ GSSBaseUpdateFunctions = {
 		target_position,
 		angle_current = entity.body.GetAngle(),
 		angle_target,
-		deceleration_thrust,
+		deceleration_vector,
 		x_force,
 		y_force,
 		angular_acceleration_needed,
@@ -162,10 +160,10 @@ GSSBaseUpdateFunctions = {
 		targets = GSS.queryAABB(entity.body.GetPosition().x-entity.detection_range, entity.body.GetPosition().y-entity.detection_range, entity.body.GetPosition().x+entity.detection_range, entity.body.GetPosition().y+entity.detection_range),
 		no_target = true;
 		
-		deceleration_thrust = new b2Vec2(0,0);
-		b2Vec2.Sub(deceleration_thrust, entity.body.GetLinearVelocity(), new b2Vec2(0, 0));
-		x_force = entity.body.GetMass()*deceleration_thrust.x;
-		y_force = entity.body.GetMass()*deceleration_thrust.y;
+		deceleration_vector = new b2Vec2(0,0);
+		b2Vec2.Sub(deceleration_vector, entity.body.GetLinearVelocity(), new b2Vec2(0, 0));
+		x_force = entity.body.GetMass()*deceleration_vector.x;
+		y_force = entity.body.GetMass()*deceleration_vector.y;
 		x_force = Math.abs(x_force) >= entity.thrust_deceleration ? entity.thrust_deceleration*(x_force > 0 ? -1 : 1): -x_force;
 		y_force = Math.abs(y_force) >= entity.thrust_deceleration ? entity.thrust_deceleration*(y_force > 0 ? -1 : 1): -y_force;
 		entity.body.ApplyForceToCenter(new b2Vec2(x_force, y_force), true);
@@ -176,6 +174,7 @@ GSSBaseUpdateFunctions = {
 			distance = 0,
 			current_distance = 0,
 			target_position;
+			
 			for(var i = 0; i < targets.length; i++)
 			{
 				if(targets[i].body.GSSData === undefined)
@@ -186,7 +185,7 @@ GSSBaseUpdateFunctions = {
 					continue;
 				if(targets[i].body.GSSData.obj.faction == entity.faction)
 					continue;
-				if(targets[i].body.GSSData.obj.id == entity.id)
+				if(targets[i].body.GSSData.obj == true || targets[i].body.GSSData.obj.id == entity.id)
 					continue;
 				
 				target = targets[i].body.GSSData.obj;
@@ -231,46 +230,15 @@ GSSBaseUpdateFunctions = {
 							else
 								entity.firing = false;							
 						}
-						else
-						{
-							entity.firing = false;
-						}	
 					}
-					else
-						entity.firing = false;
 				}
-				
-				
-				
-				/*
-				test = GSS.queryRayCast(entity.body.GetPosition(), {
-					angle: entity.body.GetAngle(),
-					distance: 1000,
-					ignores_projectiles: true,
-					ignore_entity: [entity]
-				});
-				if(test.length == 1)
-				{
-					if(test[0].body.GSSData !== undefined)
-						if(test[0].body.GSSData.obj == closest_target)
-						{
-							entity.firing = true;
-						}
-						else
-						{
-							entity.firing = false;
-						}
-				}
-				else
-				{
-					entity.firing = false;
-				}
-				*/
 			}
 		}
 		
 		if(no_target)
 		{
+			entity.firing = false;	
+			
 			angular_acceleration_needed = (-entity.angular_velocity_current/entity.angular_acceleration/GSS.FPS).clamp(-entity.angular_acceleration, entity.angular_acceleration);
 			torque = entity.body.GetInertia()*angular_acceleration_needed;
 					entity.body.ApplyTorque(torque);
@@ -325,8 +293,8 @@ GSSEntity.defaults = {
 	triangles: [],
 	
 	// Linear Movement
-	thrust_acceleration: 50,
-	thrust_deceleration: 10,
+	acceleration: -1, 
+	deceleration: -1,
 	velocity_magnitude_max: 10,
 	movement_relative_to_screen: false, 
 	
@@ -336,7 +304,8 @@ GSSEntity.defaults = {
 	lock_rotation: false,
 	follow_mouse: false,  // No acceleration 1:1 mouse tracking
 	
-	updateFunction: false
+	updateFunction: false,
+	points: 0
 	
 	
 }
@@ -387,6 +356,9 @@ function GSSEntity(index, options) {
 	this.detection_range = options.detection_range;
 	this.shoot_angle = options.shoot_angle;
 	
+	// Game Data
+	this.points = options.points;
+	
 	// Weapons handling
 	this.weapons = [];
 	for(var i = 0; i < options.weapons.length; i++)
@@ -415,6 +387,9 @@ function GSSEntity(index, options) {
 	// Thrust in Newtons
 	this.thrust_acceleration = options.thrust_acceleration;
 	this.thrust_deceleration = options.thrust_deceleration;
+	
+	this.acceleration = options.acceleration;
+	this.deceleration = options.deceleration;
 	
 	// m/s
 	this.velocity_magnitude_max = options.velocity_magnitude_max;
@@ -482,6 +457,9 @@ function GSSEntity(index, options) {
 	this.body.CreateFixtureFromDef(body_fixture);
 	this.body.GSSData = {type: 'GSSEntity', obj: this};
 	console.log('this', -GSS.faction_data[options.faction_id].category);
+	
+	this.thrust_acceleration = this.acceleration*this.body.GetMass();
+	this.thrust_deceleration = this.deceleration*this.body.GetMass();
 	
 	// END: liquidfun
 	
@@ -568,13 +546,13 @@ GSSEntity.prototype = {
 		if(!this.is_player)
 			console.log(this.body.GetAngle()*RADTODEG);
 	},
-	damage: function(damage){
+	/**
+	* asdf
+	*/
+	damage: function(damage, source){
 		if(damage === undefined || !damage || damage <= 0 || this.invincible)
-			return;
-		
-	
-		console.log('hit1', this.hp, damage, this.shield);
-		
+			return false;
+				
 		if(this.shield > 0)
 		{
 			this.shield-=damage;
@@ -591,14 +569,12 @@ GSSEntity.prototype = {
 		
 		if(this.hp === 0)
 		{
-			console.log('hit');
 			this.destroy(true);
+			return true;				
 		}
-		
-		console.log('result', this.shield, this.hp);
-		
+					
 		if(this.damage_effect)
-			return;
+			return false;
 		
 		this.damage_effect = true;
 		this.damage_next = this.damage_delay+Date.now();
@@ -606,11 +582,12 @@ GSSEntity.prototype = {
 		this.mesh_plane.scale.x = this.damage_scale;
 		this.mesh_plane.scale.y = this.damage_scale;
 		
+		return false;
 	},
 	destroy: function(with_effect){
 		if(this.mark_for_delete)
 			return;
-		console.log('hello');
+
 		this.mark_for_delete = true;
 		
 		GSS.scene.remove(this.mesh_plane);
@@ -620,7 +597,6 @@ GSSEntity.prototype = {
 		GSS.entities_to_remove.push(this);
 		if(with_effect !== undefined && with_effect)
 		{
-			console.log('asdf hai', this.death_effect_data);
 			if(this.death_sound_index != -1)
 				GSS.playSound(this.death_sound_index, this.body.GetPosition().x, this.body.GetPosition().y);
 			if(this.death_effect_data)
