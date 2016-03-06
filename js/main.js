@@ -49,7 +49,10 @@ entity_data = [
 		acceleration: 15, 
 		deceleration: 10, 
 		velocity_magnitude_max: 10, 
-		weapons:[{x: -21, y: 0, weapon_id: 0}]
+		weapons:[{x: -21, y: 0, weapon_id: 0}],
+		life: 3,
+		display_hp: true,
+		display_shield: true
 	},
 	{
 		image_data: {
@@ -287,7 +290,7 @@ GSS = {
 				console.log('All assets loaded: Showing player');
 				window.player = GSS.addEntity(0, 0, {is_player: true});
 				
-				//window.target = GSS.addEntity(1, 2, {x: 0, y: -100});
+				window.target = GSS.addEntity(1, 2, {x: 0, y: -100});
 			});
 			
 			// Load assets
