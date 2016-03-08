@@ -159,7 +159,9 @@ GSS = {
 	scene: null,
 	renderer: null,
 	camera: null,
-	camera_target_position: {x: 0, y:0},
+	camera_offset_position: {x: 0, y: 0},
+	camera_current_distance: 0,
+	camera_angle_previous: 0,
 	hp_bar_texture: new THREE.MeshBasicMaterial({color: 0x00ff00}),
 	shield_bar_texture: new THREE.MeshBasicMaterial({color: 0x0000ff}),
 	// Functions
@@ -205,6 +207,8 @@ GSS = {
 			GSS.camera.position.z = 300;
 	
 			GSS.renderer.render(GSS.scene, GSS.camera);
+			
+			GSS.camera_offset_position = new THREE.Vector3(0, 0, 0);
 			
 			/* Init Liquidfun */
 			GSS.PTM = 12;
@@ -570,20 +574,14 @@ GSS = {
 		
 		if(GSS.flag_follow_player && (GSS.player !== undefined && GSS.player))
 		{	
-			var vel = GSS.player.body.GetLinearVelocity(),
-			vel_x = vel.x*GSS.PTM,
-			vel_y = vel.y*GSS.PTM,
-			perpend_vel = new b2Vec2(-vel.y, vel.x);
-
-			b2Vec2.Normalize(perpend_vel, perpend_vel);
-			b2Vec2.MulScalar(perpend_vel, perpend_vel, -100);
-			GSS.camera.position.x = x+GSS.player.mesh_plane.position.x;
-			GSS.camera.position.y = y+GSS.player.mesh_plane.position.y;
-			var 
-			p_x = Math.cos(GSS.player.body.GetAngle()),
-			p_x = Math.sin(GSS.player.body.GetAngle());
-			//GSS.camera.position.lerp(new THREE.Vector3(GSS.player.mesh_plane.position.x, GSS.player.mesh_plane.position.y, GSS.camera.position.z), 0.005);
-			//GSS.camera_target_position = {x: x+GSS.player.mesh_plane.position.x, y: y+GSS.player.mesh_plane.position.y};
+			// This does not account for angle at all...
+			//var lerp = Math.lerp(GSS.camera_current_distance, distance, 0.05),
+			
+			//ang_lerp = Math.lerp(GSS.camera_angle_previous, GSS.camera_angle_previous+Math.nearestAngle(GSS.camera_angle_previous, angle), 0.01);
+			
+			GSS.camera_offset_position.lerp(new THREE.Vector3(x, y, 0), 0.01);
+			GSS.camera.position.x = GSS.camera_offset_position.x + GSS.player.mesh_plane.position.x;
+			GSS.camera.position.y = GSS.camera_offset_position.y + GSS.player.mesh_plane.position.y;
 		}
 		
 		// Clean up

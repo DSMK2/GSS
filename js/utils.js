@@ -20,3 +20,19 @@ RADTODEG = 180/Math.PI;
 Number.prototype.clamp = function(min, max) {
   return Math.min(Math.max(this, min), max);
 };
+
+/**
+* Source: http://stackoverflow.com/questions/1820862/obj-c-linear-interpolation-between-two-numbers
+*/
+Math.lerp = function(from, to, t) {
+	return from + (to - from) * t
+}
+
+Math.nearestAngle = function(from, to)
+{
+	var angle_delta = to-from
+	while(angle_delta < -Math.PI) { angle_delta += 360*Math.PI/180; }
+	while(angle_delta > Math.PI) { angle_delta -= 360*Math.PI/180; }
+	
+	return angle_delta;
+}
