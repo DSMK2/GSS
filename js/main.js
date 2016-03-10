@@ -1,3 +1,21 @@
+/*
+Todo(s): 
+Create UI skeleton
+	Title Screen (Sprite a sweet logo!)
+		- Build list of content that needs loading
+		- Display content
+		- Display load progress
+		- Show menu on complete
+	Menu
+		- Create animation 
+	Pre-game
+		- Pre deploy everything no updates should be running
+	Game
+		- Non stop running
+Top down shooter (arena shooter timeline has been created);
+	Enemy waves timeline
+*/
+
 /* Load this externally */
 /* Data setup 
 {
@@ -117,6 +135,15 @@ GSS = {
 	keys: {},
 	mouse_info: {x: -1, y: -1, left_click: false, right_click: false, middle_click: false},
 	
+	/*
+	* Current state game is in:
+	* 0 - Loading
+	* 1 - Displaying title
+	* 2 - Menu
+	* 3 - Game
+	*/
+	state: 0, 
+	
 	entities_index: 0,
 	entities: [],
 	entities_to_remove: [],
@@ -145,11 +172,12 @@ GSS = {
 	/* Update vars */
 	FPS: 1/60,
 	update_timer: null,
+	update_paused: false,
 	
 	/* Web audio API vars */
 	audio_context: null, 
-	audio_panner: null,
 	audio_gain: null,
+	
 	/* Liquidfun vars */
 	PTM: null,
 	world: null,
@@ -158,12 +186,16 @@ GSS = {
 	canvas: null,
 	scene: null,
 	renderer: null,
+	clear_color: new THREE.Color(0x000000),
+	// Camera
 	camera: null,
 	camera_offset_position: {x: 0, y: 0},
 	camera_current_distance: 0,
 	camera_angle_previous: 0,
+	// For debug HP/Shield Display
 	hp_bar_texture: new THREE.MeshBasicMaterial({color: 0x00ff00}),
 	shield_bar_texture: new THREE.MeshBasicMaterial({color: 0x0000ff}),
+	
 	// Functions
 	/**
 	* Init
@@ -175,24 +207,19 @@ GSS = {
 			canvas_width = canvas.clientWidth,
 			canvas_height = canvas.clientHeight,
 			near = 0.1,
-			far = 10000;
+			far = 10000,
+			assets_to_load = 0;
 			
 			/* Init Web Audio API */
 			// See: http://www.html5rocks.com/en/tutorials/webaudio/intro/
 			window.AudioContext = window.AudioContext || window.webkitAudioContext;
 			GSS.audio_context = new AudioContext();
 			GSS.audio_context.listener.setPosition($(window).width()/2, $(window).height()/2, 300);
+			
+			// Global volume
 			GSS.audio_gain = GSS.audio_context.createGain();
-			GSS.audio_gain.gain.value = 0.1;
-			GSS.audio_gain.connect(GSS.audio_context.destination);
-			
-			GSS.audio_panner = GSS.audio_context.createPanner();
-			GSS.audio_panner.coneOuterGain = 0.5;
-			GSS.audio_panner.coneOuterAngle = 360;
-			GSS.audio_panner.coneInnerAngle  = 0;
-			
-			GSS.audio_panner.connect(GSS.audio_context.destination);			
-			GSS.audio_context.listener.setPosition(canvas_width/2, canvas_height/2, 0);
+			GSS.audio_gain.gain.value = 0.7;
+			GSS.audio_gain.connect(GSS.audio_context.destination);	
 			
 			/* Init THREE.js */
 			GSS.canvas = canvas;
@@ -200,7 +227,7 @@ GSS = {
 			GSS.camera = new THREE.OrthographicCamera( canvas_width / - 2, canvas_width / 2, canvas_height / 2, canvas_height / - 2, near, far );
 			GSS.scene = new THREE.Scene();
 
-			GSS.renderer.setClearColor(0x000000);
+			GSS.renderer.setClearColor(GSS.clear_color);
 			GSS.renderer.setSize(canvas_width, canvas_height);
 			
 			GSS.scene.add(GSS.camera);
@@ -289,7 +316,8 @@ GSS = {
 				if(images_loaded && audio_loaded)
 					window.dispatchEvent(GSS.event_assets_loaded);
 			});
-
+			
+			// CHange this
 			window.addEventListener('all_assets_loaded', function(){
 				console.log('All assets loaded: Showing player');
 				window.player = GSS.addEntity(0, 0, {is_player: true});
@@ -327,12 +355,30 @@ GSS = {
 					window.dispatchEvent(GSS.event_images_loaded);
 			}
 			
-			/* Ensures all audio assets can play */
-			function loadAudio(){
-				num_audio_loaded++;
-				if(num_audio_loaded == GSS.audio_data.length)
-					window.dispatchEvent(GSS.event_audio_loaded);
+			function loadAudioURL(url, index){
+				var request = new XMLHttpRequest(),
+				index = index;
+				request.open('GET', url, true);
+				request.responseType = 'arraybuffer';
+				
+				request.onload = function(){
+					num_audio_loaded++;
+					GSS.audio_context.decodeAudioData(request.response, function(buffer) {
+						if(!buffer)
+						{
+							console.error('failed to load audio file');
+							GSS.audio_data[index].buffer = false;
+							return;
+						}
+						GSS.audio_data[index].buffer = buffer;
+					}, function(){console.error('failed');});
+					if(num_audio_loaded == GSS.audio_data.length)
+						window.dispatchEvent(GSS.event_audio_loaded);
+				}
+				
+				request.send();
 			}
+
 			
 			// Process factions (for collision filters) up to 16?
 			for(var i = 0; i < faction_data.length; i++)
@@ -371,8 +417,6 @@ GSS = {
 						break;
 					}
 				}
-				
-				
 				
 				if(entity_image_existing_index == -1)
 				{
@@ -482,7 +526,9 @@ GSS = {
 			 	GSS.weapon_data.push(current_weapon_data);
 			 	console.log('audio to load', GSS.audio_data);
 			}
-				
+			
+			assets_to_load = GSS.image_data.length + GSS.audio_data.length;
+			
 			// Load images if empty (this should rarely happen)
 			if(GSS.image_data.length === 0)
 				window.dispatchEvent(event_images_loaded);
@@ -506,36 +552,11 @@ GSS = {
 				audio_urls.push(GSS.audio_data[i].url);	
 			}
 			
-		
-			function loadAudioURL(url, index){
-				var request = new XMLHttpRequest(),
-				index = index;
-				request.open('GET', url, true);
-				request.responseType = 'arraybuffer';
-				
-				request.onload = function(){
-					num_audio_loaded++;
-					GSS.audio_context.decodeAudioData(request.response, function(buffer) {
-						if(!buffer)
-						{
-							console.error('failed to load audio file');
-							GSS.audio_data[index].buffer = false;
-							return;
-						}
-						GSS.audio_data[index].buffer = buffer;
-					}, function(){console.error('failed');});
-					if(num_audio_loaded == GSS.audio_data.length)
-						window.dispatchEvent(GSS.event_audio_loaded);
-				}
-				
-				request.send();
-			}
-
 			for(var i = 0; i < audio_urls.length; i++)
 			{
 				loadAudioURL(audio_urls[i], i);
 			}
-
+			
 			flag_init = true;
 	},
 	/**
@@ -543,7 +564,7 @@ GSS = {
 	* Updates the current state of the GSS game world, handles camera tracking of player and cleans up 'dead' entities and projectiles	
 	*/
 	update: function() {
-		if(GSS.world === undefined)
+		if(GSS.world === undefined || GSS.update_paused)
 			return;
 			
 		var offset_mouse_x = GSS.mouse_info.x-GSS.canvas.clientWidth/2,
@@ -558,21 +579,15 @@ GSS = {
 		GSS.world.Step(GSS.FPS, 6, 2);
 		
 		for(var e = 0; e < GSS.entities.length; e++)
-		{
 			GSS.entities[e].update();
-		}
 		
 		for(var p = 0; p < GSS.projectiles.length; p++)
-		{
 			GSS.projectiles[p].update();
-		}
 		
 		for(var ef = 0; ef < GSS.effects.length; ef++)
-		{
 			GSS.effects[ef].update();
-		}
 		
-		if(GSS.flag_follow_player && (GSS.player !== undefined && GSS.player))
+		if(GSS.flag_follow_player && (GSS.player !== undefined && GSS.player && !GSS.player.mark_for_delete))
 		{	
 			// This does not account for angle at all...
 			//var lerp = Math.lerp(GSS.camera_current_distance, distance, 0.05),

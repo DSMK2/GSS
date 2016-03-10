@@ -19,12 +19,12 @@ GSSEntity.defaults = {
 	hp_regen_rate: -1,
 	
 	shield_max: 100,
-	shield_regen_rate: 1000,
+	shield_regen_rate: 100,
 	shield_regen_amount: 1,
-	shield_regen_delay: 1000, // For depletion
+	shield_regen_delay: 5000, // For depletion
 	
 	life: 0,
-	life_delay: 5000,
+	life_delay: 500,
 	
 	death_sound_index: -1,
 	death_effect_data: false,
@@ -112,6 +112,10 @@ function GSSEntity(index, options) {
 	this.death_effect_data = options.death_effect_data;
 	
 	this.life = options.life;
+	this.life_delay = options.life_delay;
+	this.life_next = -1;
+	this.life_flicker_delay = 10;
+	this.life_flicker_next = Date.now();
 	
 	// AI Data
 	this.detection_range = options.detection_range;
@@ -217,11 +221,9 @@ function GSSEntity(index, options) {
 	this.body = GSS.world.CreateBody(body_def);
 	this.body.CreateFixtureFromDef(body_fixture);
 	this.body.GSSData = {type: 'GSSEntity', obj: this};
-	console.log('this', -GSS.faction_data[options.faction_id].category);
 	
 	this.thrust_acceleration = this.acceleration*this.body.GetMass();
 	this.thrust_deceleration = this.deceleration*this.body.GetMass();
-	
 	// END: liquidfun
 	
 	this.updateFunction = options.updateFunction;
@@ -316,7 +318,8 @@ GSSEntity.prototype = {
 			this.shield-=damage;
 			this.shield = this.shield < 0 ? 0 : this.shield;
 		}
-		else if(this.shield === 0)
+		
+		if(this.shield === 0)
 		{
 			this.shield_depleted = true;
 			this.shield_regen_delay_next = Date.now()+this.shield_regen_delay;
@@ -327,16 +330,24 @@ GSSEntity.prototype = {
 		
 		if(this.hp === 0)
 		{
-			this.destroy(true, this.life == 0);
+			
 			
 			if(this.life > 0)
 			{
 				this.life--;
-				this.display_hp = false;
-				this.display_shield = false;
-				this.hp = this.hp_max;
-				this.shield = this.shield_max;
+				this.shield_depleted = false;
+				this.invincible = true;
+				
+				this.life_next = Date.now()+this.life_delay;
+								
+				if(this.death_sound_index != -1)
+					GSS.playSound(this.death_sound_index, this.body.GetPosition().x, this.body.GetPosition().y);
+				if(this.death_effect_data)
+					GSS.addEffect(this.death_effect_data, this.body.GetPosition().x*GSS.PTM, this.body.GetPosition().y*GSS.PTM);
 			}
+			
+			else 
+				this.destroy(true);
 			
 			return true;				
 		}
@@ -352,23 +363,17 @@ GSSEntity.prototype = {
 		
 		return false;
 	},
-	destroy: function(with_effect, mark_for_delete){
+	destroy: function(with_effect){
 		if(this.mark_for_delete)
 			return;
 		
-		this.mark_for_delete = mark_for_delete !== undefined ? mark_for_delete : true;
-		
-		
-		if(this.mark_for_delete)
-		{
-			GSS.entities_to_remove.push(this);
-			GSS.scene.remove(this.mesh_plane);
-			GSS.scene.remove(this.display_hp_mesh);
-			GSS.scene.remove(this.display_shield_mesh);
-			GSS.world.DestroyBody(this.body);
-		}	
-		
-		this.mesh_plane.visible = false;
+		this.mark_for_delete = true;
+				
+		GSS.entities_to_remove.push(this);
+		GSS.scene.remove(this.mesh_plane);
+		GSS.scene.remove(this.display_hp_mesh);
+		GSS.scene.remove(this.display_shield_mesh);
+		GSS.world.DestroyBody(this.body);
 		
 		if(with_effect !== undefined && with_effect)
 		{
@@ -399,6 +404,7 @@ GSSEntity.prototype = {
 			this.updateFunction(this);
 		else
 			GSSBaseUpdateFunctions.updateStatic(this);
+		
 		if(this.firing)
 			this.fireWeapons();
 		
@@ -439,6 +445,35 @@ GSSEntity.prototype = {
 		else
 			this.display_shield_mesh.visible = false;
 		
+		// Life usage indicator
+		if(Date.now() < this.life_next)
+		{
+			var progress = ((1-(this.life_next-Date.now())/this.life_delay)/0.95).clamp(0, 1);
+			if(Date.now() >= this.life_flicker_next)
+			{
+				this.material.opacity = this.material.opacity == 1 ? 0.1 : 1;
+				this.mesh_plane.scale.x = this.mesh_plane.scale.x == 1 ? 2 : 1;
+				this.mesh_plane.scale.y = this.mesh_plane.scale.y == 1 ? 2 : 1;
+				this.life_flicker_next = Date.now()+this.life_flicker_delay;
+			}
+			
+			
+			
+			// Restore shield and HP
+			this.hp = (this.hp_max*progress).clamp(0, this.hp_max);
+			this.shield = (this.shield_max*progress).clamp(0, this.shield_max);
+		}
+		else if(this.life_next != -1 && Date.now() >= this.life_next)
+		{
+			this.invincible = false;
+			this.material.opacity = 1;
+			this.mesh_plane.scale.x = 1;
+			this.mesh_plane.scale.y = 1;
+			
+			this.hp = this.hp_max;
+			this.shield = this.shield_max;
+			this.life_next = -1;
+		}
 		
 		// Animation
 		if(Date.now() >= this.frame_next && !this.body_image_data.animate_on_fire)
@@ -670,15 +705,13 @@ GSSBaseUpdateFunctions = {
 				target_position = target.body.GetPosition();
 
 				current_distance = Math.sqrt(Math.pow(entity.body.GetPosition().x-target_position.x, 2) + Math.pow(entity.body.GetPosition().y-target_position.y, 2));
-				if(closest_target == false)
+				if(closest_target == false && current_distance <= entity.detection_range)
 				{
 					closest_target = target;
 					distance = current_distance;
 				}
-				else if(distance > current_distance)
+				else if(distance > current_distance && current_distance <= entity.detection_range)
 					closest_target = target;
-					
-				
 					
 				target_position = closest_target.body.GetPosition();
 				var test = GSS.queryRayCast(entity.body.GetPosition(), {
@@ -686,11 +719,12 @@ GSSBaseUpdateFunctions = {
 					ignores_projectiles: true,
 					ignore_entity: [entity]
 				});
+				
 				if(test.length == 1)
 				{
 					if(test[0].body.GSSData !== undefined)
 					{
-						if(test[0].body.GSSData.obj == closest_target)
+						if(test[0].body.GSSData.obj == closest_target && (closest_target == GSS.player && !closest_target.invincible))
 						{
 							no_target = false;
 							entity.lookAtPosition(target_position.x, target_position.y);
