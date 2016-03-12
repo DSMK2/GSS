@@ -491,7 +491,7 @@ GSSEntity.prototype = {
 		else if(this.body_image_data.animate_on_fire && !this.firing)
 		{
 			this.frame_current = 0;
-			this.mesh_plane.material.map.offset.x = 1-(this.three_data.width*(1/(0+1)))/this.three_data.width;
+			this.mesh_plane.material.map.offset.x = 0;
 		}
 
 		// Damage effect "recovery"

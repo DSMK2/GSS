@@ -134,7 +134,14 @@ var world,
 GSS = {
 	keys: {},
 	mouse_info: {x: -1, y: -1, left_click: false, right_click: false, middle_click: false},
-	
+	basic_assets: {
+		title: {
+			image_data: {
+				url: 'images/title.png',
+				frames: 1
+			}
+		}
+	},
 	/*
 	* Current state game is in:
 	* 0 - Loading
@@ -186,7 +193,7 @@ GSS = {
 	canvas: null,
 	scene: null,
 	renderer: null,
-	clear_color: new THREE.Color(0x000000),
+	clear_color: new THREE.Color(0xdddddd),
 	// Camera
 	camera: null,
 	camera_offset_position: {x: 0, y: 0},
@@ -305,7 +312,17 @@ GSS = {
 			// Events
 			window.addEventListener('all_images_loaded', function(){
 				images_loaded = true;
+				
+				var image_data = GSS.image_data[GSS.basic_assets.title.image_data.index],
+				material = new THREE.MeshBasicMaterial({map: image_data.texture, transparent:true});
+				
+				material.side = THREE.DoubleSide;
+				material.shading = THREE.FlatShading;
 				console.log('images_loaded');
+				console.info(image_data);
+				GSS.basic_assets.title.mesh = new THREE.Mesh(new THREE.PlaneGeometry(image_data.width, image_data.height), material);
+				GSS.basic_assets.title.mesh.material.opacity = 0;
+				
 				if(images_loaded && audio_loaded)
 					window.dispatchEvent(GSS.event_assets_loaded);
 			});
@@ -320,9 +337,11 @@ GSS = {
 			// CHange this
 			window.addEventListener('all_assets_loaded', function(){
 				console.log('All assets loaded: Showing player');
+				GSS.setState(1);
+				/*
 				window.player = GSS.addEntity(0, 0, {is_player: true});
-				
 				window.target = GSS.addEntity(1, 2, {x: 0, y: -100});
+				*/
 			});
 			
 			// Load assets
@@ -337,17 +356,16 @@ GSS = {
 				
 				if(image_index == -1)
 					return;
-			
+				
 				// Prevents blurry sprites
 				texture.anisotropy = 0;
 				texture.minFilter = THREE.NearestFilter;
 				texture.magFilter = THREE.NearestFilter;
 				texture.repeat.x = (texture.image.width/GSS.image_data[image_index].frames)/texture.image.width;
-
+				console.info(texture.repeat.x, texture.image.width, GSS.image_data[image_index].url, GSS.image_data[image_index].frames);
 				GSS.image_data[image_index].texture = texture;
 				GSS.image_data[image_index].width = texture.image.width;
 				GSS.image_data[image_index].height = texture.image.height;
-				GSS.image_data[image_index].material =  material;
 				
 				num_images_loaded++;
 	
@@ -379,6 +397,10 @@ GSS = {
 				request.send();
 			}
 
+			// Load basic assets
+			// Load title
+			GSS.image_data.push({url: GSS.basic_assets.title.image_data.url, index: GSS.image_data.length, frames: GSS.basic_assets.title.image_data.frames});
+			GSS.basic_assets.title.image_data.index = GSS.image_data.length-1;
 			
 			// Process factions (for collision filters) up to 16?
 			for(var i = 0; i < faction_data.length; i++)
@@ -559,6 +581,36 @@ GSS = {
 			
 			flag_init = true;
 	},
+	setState: function(state) {
+		
+		switch(state) 
+		{
+			case 0:
+				// Maybe debug?
+				break;
+			case 1:
+				{
+				console.log('asdf');
+				GSS.basic_assets.title.mesh.position.y-=100;
+				GSS.scene.add(GSS.basic_assets.title.mesh);
+				console.log(GSS.basic_assets.title.mesh);
+				}
+				break;
+			case 2:
+				break;
+				
+			case 3:
+				console.log('asdf3');
+				window.player = GSS.addEntity(0, 0, {is_player: true});
+				window.target = GSS.addEntity(1, 2, {x: 0, y: -100});
+				break;
+			
+			
+			default:
+				return;
+		}
+		GSS.state = state;
+	},
 	/**
 	* update
 	* Updates the current state of the GSS game world, handles camera tracking of player and cleans up 'dead' entities and projectiles	
@@ -566,7 +618,8 @@ GSS = {
 	update: function() {
 		if(GSS.world === undefined || GSS.update_paused)
 			return;
-			
+		
+		
 		var offset_mouse_x = GSS.mouse_info.x-GSS.canvas.clientWidth/2,
 		offset_mouse_y = -(GSS.mouse_info.y-GSS.canvas.clientHeight/2),
 		angle = Math.atan2(offset_mouse_y, offset_mouse_x), 
@@ -575,50 +628,60 @@ GSS = {
 		x = distance*Math.cos(angle),
 		y = distance*Math.sin(angle);
 		
-		GSS.old_time = (new Date()).getMilliseconds();
-		GSS.world.Step(GSS.FPS, 6, 2);
-		
-		for(var e = 0; e < GSS.entities.length; e++)
-			GSS.entities[e].update();
-		
-		for(var p = 0; p < GSS.projectiles.length; p++)
-			GSS.projectiles[p].update();
-		
-		for(var ef = 0; ef < GSS.effects.length; ef++)
-			GSS.effects[ef].update();
-		
-		if(GSS.flag_follow_player && (GSS.player !== undefined && GSS.player && !GSS.player.mark_for_delete))
-		{	
-			// This does not account for angle at all...
-			//var lerp = Math.lerp(GSS.camera_current_distance, distance, 0.05),
+		if(GSS.state == 1)
+		{
+			GSS.basic_assets.title.mesh.position.lerp(new THREE.Vector3(0, 0, 0), 0.01);
+			GSS.basic_assets.title.mesh.material.opacity = Math.lerp(GSS.basic_assets.title.mesh.material.opacity, 1, 0.01);
+			if(Math.round(GSS.basic_assets.title.mesh.position.y) === 0)
+				GSS.setState(3);
+		}
+		else if(GSS.state == 3)
+		{
+			GSS.old_time = (new Date()).getMilliseconds();
+			GSS.world.Step(GSS.FPS, 6, 2);
 			
-			//ang_lerp = Math.lerp(GSS.camera_angle_previous, GSS.camera_angle_previous+Math.nearestAngle(GSS.camera_angle_previous, angle), 0.01);
+			for(var e = 0; e < GSS.entities.length; e++)
+				GSS.entities[e].update();
 			
-			GSS.camera_offset_position.lerp(new THREE.Vector3(x, y, 0), 0.01);
-			GSS.camera.position.x = GSS.camera_offset_position.x + GSS.player.mesh_plane.position.x;
-			GSS.camera.position.y = GSS.camera_offset_position.y + GSS.player.mesh_plane.position.y;
-		}
-		
-		// Clean up
-		while(GSS.entities_to_remove.length !== 0)
-		{
-			var entity = GSS.entities_to_remove.pop(),
-			index = GSS.getEntityWithID(entity.id);
-			GSS.entities.splice(index, 1);
-		}
-		
-		while(GSS.projectiles_to_remove.length !== 0)
-		{
-			var projectile = GSS.projectiles_to_remove.pop(),
-			index = GSS.getProjectileWithID(projectile.id);
-			GSS.projectiles.splice(index, 1);
-		}
-		
-		while(GSS.effects_to_remove.length !== 0)
-		{
-			var effect = GSS.effects_to_remove.pop(),
-			index = GSS.getEffectWithID(effect.id);
-			GSS.effects.splice(index, 1);
+			for(var p = 0; p < GSS.projectiles.length; p++)
+				GSS.projectiles[p].update();
+			
+			for(var ef = 0; ef < GSS.effects.length; ef++)
+				GSS.effects[ef].update();
+			
+			if(GSS.flag_follow_player && (GSS.player !== undefined && GSS.player && !GSS.player.mark_for_delete))
+			{	
+				// This does not account for angle at all...
+				//var lerp = Math.lerp(GSS.camera_current_distance, distance, 0.05),
+				
+				//ang_lerp = Math.lerp(GSS.camera_angle_previous, GSS.camera_angle_previous+Math.nearestAngle(GSS.camera_angle_previous, angle), 0.01);
+				
+				GSS.camera_offset_position.lerp(new THREE.Vector3(x, y, 0), 0.01);
+				GSS.camera.position.x = GSS.camera_offset_position.x + GSS.player.mesh_plane.position.x;
+				GSS.camera.position.y = GSS.camera_offset_position.y + GSS.player.mesh_plane.position.y;
+			}
+			
+			// Clean up
+			while(GSS.entities_to_remove.length !== 0)
+			{
+				var entity = GSS.entities_to_remove.pop(),
+				index = GSS.getEntityWithID(entity.id);
+				GSS.entities.splice(index, 1);
+			}
+			
+			while(GSS.projectiles_to_remove.length !== 0)
+			{
+				var projectile = GSS.projectiles_to_remove.pop(),
+				index = GSS.getProjectileWithID(projectile.id);
+				GSS.projectiles.splice(index, 1);
+			}
+			
+			while(GSS.effects_to_remove.length !== 0)
+			{
+				var effect = GSS.effects_to_remove.pop(),
+				index = GSS.getEffectWithID(effect.id);
+				GSS.effects.splice(index, 1);
+			}
 		}
 	},
 	/**
@@ -910,6 +973,7 @@ jQuery(function($){
 	GSS.init($canvas[0], faction_data, entity_data, weapon_data);
 
 	// Temp LiquidFun 
+	/*
 	var 
 	ground_def = new b2BodyDef(),
 	ground_body,
@@ -924,6 +988,7 @@ jQuery(function($){
 	ground_mesh.position.x = ground_body.GetPosition().x*GSS.PTM;
 	ground_mesh.position.y = ground_body.GetPosition().y*GSS.PTM;
 	GSS.scene.add(ground_mesh);
+	*/
 	
 	$(window).on('resize', function(){
 		canvas_width = $canvas.width();
