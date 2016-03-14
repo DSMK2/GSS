@@ -14,7 +14,7 @@ UIElement.init = function(renderer, scene, camera, debug)
 	* Get UIElement mouse over
 	*/
 	UIElement.update = function(){
-		if(UIElement.renderer === undefined && UIElement.scene === undefined && UIElement.camera === undefined)
+		if((UIElement.renderer === undefined && UIElement.scene === undefined && UIElement.camera === undefined) || UIElement.elements.length == 0)
 			return;
 		
 		// Because calling 'this' repeatedly is getting old
@@ -36,22 +36,31 @@ UIElement.init = function(renderer, scene, camera, debug)
 		raycaster.setFromCamera(mouse_position, camera); 
 		intersects = raycaster.intersectObjects (scene.children);
 		
-		closest = intersects[0];
-		if(intersects.length !== 0 && closest.object.UIElement !== undefined)
+		if(intersects.length !== 0)
 		{
-			element = closest.object.UIElement;
-			if(element.state < 3)
+			closest = intersects[0];
+			if(closest.object.UIElement !== undefined)
 			{
-				if(UIElement.mouse_info.left_click)
-					element.state = 2;
-				else
-					element.state = 1;
+				
+				element = closest.object.UIElement;
+				if(element.state < 3)
+				{
+					if(UIElement.mouse_info.left_click)
+						element.state.setState(2, true);
+					else
+						element.state.setState(1);
+				}
 			}
 		}
 		
 		for(elements_counter = 0; elements_counter < elements.length; elements_counter++)
 		{
 			element = elements[elements_counter];
+			
+			// Do not update mouse overered element
+			if((closest !== undefined && closest.object.UIElement !== undefined && element !== closest.object.UIElement) || closest === undefined)
+				element.setState(0);
+				
 			element.update();
 		}
 	};
@@ -89,7 +98,6 @@ function UIElement(options) {
 		
 		if(UIElement.scene === undefined || UIElement.camera === undefined)
 		{
-			console.log('asdf');
 			if(options.debug) console.error('UIElement: Missing scene or camera', UIElement.scene, UIElement.camera);
 			return;
 		}
@@ -108,6 +116,8 @@ function UIElement(options) {
 		
 		this.state = options.state;
 		this.debug = options.debug;
+		
+		this.callback = options.callback;
 		
 		/* BEGIN: THREE.js */
 		material = new THREE.MeshBasicMaterial({map: this.map, transparent: true});
@@ -133,9 +143,15 @@ UIElement.prototype = {
 		this.mesh.scale.x = new_scale;
 		this.mesh.scale.y = new_scale;
 	},
-	setState: function(new_state)
+	setState: function(new_state, click)
 	{
+		if(this.state == new_state)
+			return;
+			
 		this.state = new_state;
+		
+		if(click !== undefined && click == true)
+			this.callback();
 	},
 	update: function(){
 		if(this.state === 4)
@@ -151,7 +167,6 @@ UIElement.prototype = {
 		}
 		
 		this.mesh.material.map.offset.y = 1-(this.state/this.vertical_frames)-(1/this.vertical_frames);
-		this.state = 0;
 	}
 }
 
