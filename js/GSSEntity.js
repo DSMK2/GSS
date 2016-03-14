@@ -10,7 +10,7 @@ GSSEntity.defaults = {
 	image_frames: 1,
 	image_frame_rate: 0,
 	animate_on_fire: false,
-	body_image_data: false,
+	image_data: false,
 	image_data: false,
 	
 	/* Life and death */
@@ -81,9 +81,9 @@ function GSSEntity(index, options) {
 	options = extend(GSSEntity.defaults, options);
 	
 	// BEGIN: GSSEntity Data
-	this.body_image_data = options.image_data;
+	this.image_data = options.image_data;
 	this.frame_current = 0;
-	this.frame_next = Date.now()+this.body_image_data.frame_rate;
+	this.frame_next = Date.now()+this.image_data.frame_rate;
 	
 	this.polygons;
 	this.id = index;
@@ -172,13 +172,15 @@ function GSSEntity(index, options) {
 	// END: Movement stats
 	
 	// BEGIN: THREE.js
-	this.three_data = GSS.image_data[this.body_image_data.image_index];
+	this.three_data = GSS.image_data[this.image_data.image_index];
+	console.log(this.three_data);
 	this.texture = this.three_data.texture.clone();
+	this.texture.repeat.x = (this.texture.image.width/this.image_data.horizontal_frames)/this.texture.image.width;
 	this.texture.needsUpdate = true;
 	this.material = new THREE.MeshBasicMaterial({map: this.texture, wireframe: false, transparent: true});
 	this.material.side = THREE.DoubleSide;
 	this.material.shading = THREE.FlatShading;
-	this.mesh_plane = new THREE.Mesh(new THREE.PlaneGeometry(this.three_data.width/this.body_image_data.frames, this.three_data.height), this.material);
+	this.mesh_plane = new THREE.Mesh(new THREE.PlaneGeometry(this.three_data.width/this.image_data.horizontal_frames, this.three_data.height), this.material);
 	GSS.scene.add(this.mesh_plane);
 	
 	this.damage_delay = 50;
@@ -216,7 +218,7 @@ function GSSEntity(index, options) {
 	body_fixture.filter.groupIndex = -GSS.faction_data[options.faction_id].category; // Same faction does not collide with each other
 	body_fixture.filter.categoryBits = 0x0002;
 	body_fixture.shape = new b2PolygonShape();
-	body_fixture.shape.SetAsBoxXY(this.three_data.width/this.body_image_data.frames/2/GSS.PTM, this.three_data.height/2/GSS.PTM);
+	body_fixture.shape.SetAsBoxXY(this.three_data.width/this.image_data.horizontal_frames/2/GSS.PTM, this.three_data.height/2/GSS.PTM);
 	
 	this.body = GSS.world.CreateBody(body_def);
 	this.body.CreateFixtureFromDef(body_fixture);
@@ -476,19 +478,19 @@ GSSEntity.prototype = {
 		}
 		
 		// Animation
-		if(Date.now() >= this.frame_next && !this.body_image_data.animate_on_fire)
+		if(Date.now() >= this.frame_next && !this.image_data.animate_on_fire)
 		{
-			this.frame_current  = this.frame_current == this.body_image_data.frames-1 ? 0 : this.frame_current+1;
-			this.mesh_plane.material.map.offset.x = this.frame_current/this.body_image_data.frames;
-			this.frame_next = Date.now()+this.body_image_data.frame_rate;
+			this.frame_current  = this.frame_current == this.image_data.horizontal_frames-1 ? 0 : this.frame_current+1;
+			this.mesh_plane.material.map.offset.x = this.frame_current/this.image_data.horizontal_frames;
+			this.frame_next = Date.now()+this.image_data.frame_rate;
 		}
-		else if(Date.now() >= this.frame_next && this.body_image_data.animate_on_fire && this.firing)
+		else if(Date.now() >= this.frame_next && this.image_data.animate_on_fire && this.firing)
 		{
-			this.frame_current  = this.frame_current == this.body_image_data.frames-1 ? 0 : this.frame_current+1;
-			this.mesh_plane.material.map.offset.x = this.frame_current/this.body_image_data.frames;
-			this.frame_next = Date.now()+this.body_image_data.frame_rate;
+			this.frame_current  = this.frame_current == this.image_data.horizontal_frames-1 ? 0 : this.frame_current+1;
+			this.mesh_plane.material.map.offset.x = this.frame_current/this.image_data.horizontal_frames;
+			this.frame_next = Date.now()+this.image_data.frame_rate;
 		}
-		else if(this.body_image_data.animate_on_fire && !this.firing)
+		else if(this.image_data.animate_on_fire && !this.firing)
 		{
 			this.frame_current = 0;
 			this.mesh_plane.material.map.offset.x = 0;

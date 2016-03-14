@@ -28,12 +28,12 @@ var weapon_data = [
 		projectile_data: {	
 			image_data: {
 				url: 'images/laser_beam.png', 
-				frames: 1
+				horizontal_frames: 1
 			},
 			hit_effect_data: {
 				image_data: {
 					url: 'images/projectile_hit.png', 
-					frames: 5,
+					horizontal_frames: 5,
 					frame_rate: 500
 				},
 				lifetime: 200,
@@ -57,7 +57,7 @@ entity_data = [
 	{
 		image_data: {
 			url: 'images/simplefighter.png', 
-			frames: 2, 
+			horizontal_frames: 2, 
 			frame_rate: 100, 
 			animate_on_fire: true
 		}, 
@@ -75,7 +75,7 @@ entity_data = [
 	{
 		image_data: {
 			url: 'images/test_target.png', 
-			frames: 5, 
+			horizontal_frames: 5, 
 			frame_rate: 500, 
 		}, 
 		angle: 90, 
@@ -88,7 +88,7 @@ entity_data = [
 		death_effect_data: {
 			image_data: {
 				url: 'images/projectile_hit.png', 
-				frames: 5,
+				horizontal_frames: 5,
 				frame_rate: 500
 			},
 			lifetime: 200,
@@ -101,7 +101,7 @@ entity_data = [
 	{
 		image_data: {
 			url: 'images/simplefighter.png', 
-			frames: 2, 
+			horizontal_frames: 2, 
 			frame_rate: 100, 
 			animate_on_fire: true
 		}, 
@@ -140,6 +140,13 @@ GSS = {
 				url: 'images/title.png',
 				frames: 1
 			}
+		},
+		start_button: {
+			image_data: {
+				url: 'images/start_button.png',
+				horizontal_frames : 1,
+				vertical_frames: 4
+			}
 		}
 	},
 	/*
@@ -149,7 +156,7 @@ GSS = {
 	* 2 - Menu
 	* 3 - Game
 	*/
-	state: 0, 
+	state: 3, 
 	
 	entities_index: 0,
 	entities: [],
@@ -247,7 +254,7 @@ GSS = {
 			/* Init Liquidfun */
 			GSS.PTM = 12;
 			GSS.world = world = new b2World(new b2Vec2(0, 0));
-		
+			UIElement.init(GSS.renderer, GSS.scene, GSS.camera);
 			// Collision handling
 			GSS.world.SetContactListener({
 				BeginContactBody: function(contact) {
@@ -313,15 +320,24 @@ GSS = {
 			window.addEventListener('all_images_loaded', function(){
 				images_loaded = true;
 				
-				var image_data = GSS.image_data[GSS.basic_assets.title.image_data.index],
-				material = new THREE.MeshBasicMaterial({map: image_data.texture, transparent:true});
+				var 
+				title_image_data = GSS.image_data[GSS.basic_assets.title.image_data.index],
+				start_button_image_data = GSS.image_data[GSS.basic_assets.start_button.image_data.index],
+				title_material = new THREE.MeshBasicMaterial({map: title_image_data.texture, transparent:true});
+				//button_material = new THREE.MeshBasicMaterial({map: start_button_image_data, transparent: true});
 				
-				material.side = THREE.DoubleSide;
-				material.shading = THREE.FlatShading;
-				console.log('images_loaded');
-				console.info(image_data);
-				GSS.basic_assets.title.mesh = new THREE.Mesh(new THREE.PlaneGeometry(image_data.width, image_data.height), material);
+				//title_material.side = THREE.DoubleSide;
+				//title_material.shading = THREE.FlatShading;
+
+				GSS.basic_assets.title.mesh = new THREE.Mesh(new THREE.PlaneGeometry(title_image_data.width, title_image_data.height), title_material);
 				GSS.basic_assets.title.mesh.material.opacity = 0;
+				
+				GSS.basic_assets.start_button.button = new UIElement({
+					map: start_button_image_data.texture,
+					scale: 5,
+					horizontal_frames: 1,
+					vertical_frames: 4
+				});//new THREE.Mesh(new THREE.PlaneGeometry(start_button_image_data.width, start_button_image_data.height), button_material);
 				
 				if(images_loaded && audio_loaded)
 					window.dispatchEvent(GSS.event_assets_loaded);
@@ -361,7 +377,7 @@ GSS = {
 				texture.anisotropy = 0;
 				texture.minFilter = THREE.NearestFilter;
 				texture.magFilter = THREE.NearestFilter;
-				texture.repeat.x = (texture.image.width/GSS.image_data[image_index].frames)/texture.image.width;
+				texture.repeat.x = 1; //(texture.image.width/GSS.image_data[image_index].frames)/texture.image.width;
 				console.info(texture.repeat.x, texture.image.width, GSS.image_data[image_index].url, GSS.image_data[image_index].frames);
 				GSS.image_data[image_index].texture = texture;
 				GSS.image_data[image_index].width = texture.image.width;
@@ -401,6 +417,8 @@ GSS = {
 			// Load title
 			GSS.image_data.push({url: GSS.basic_assets.title.image_data.url, index: GSS.image_data.length, frames: GSS.basic_assets.title.image_data.frames});
 			GSS.basic_assets.title.image_data.index = GSS.image_data.length-1;
+			GSS.image_data.push({url: GSS.basic_assets.start_button.image_data.url, index: GSS.image_data.length})
+			GSS.basic_assets.start_button.image_data.index = GSS.image_data.length-1;
 			
 			// Process factions (for collision filters) up to 16?
 			for(var i = 0; i < faction_data.length; i++)
@@ -597,6 +615,9 @@ GSS = {
 				}
 				break;
 			case 2:
+				
+				GSS.basic_assets.start_button.button.mesh.position.y = -200;
+				GSS.scene.add(GSS.basic_assets.start_button.button.mesh);
 				break;
 				
 			case 3:
@@ -633,7 +654,12 @@ GSS = {
 			GSS.basic_assets.title.mesh.position.lerp(new THREE.Vector3(0, 0, 0), 0.01);
 			GSS.basic_assets.title.mesh.material.opacity = Math.lerp(GSS.basic_assets.title.mesh.material.opacity, 1, 0.01);
 			if(Math.round(GSS.basic_assets.title.mesh.position.y) === 0)
-				GSS.setState(3);
+				GSS.setState(2);
+		}
+		else if(GSS.state == 2)
+		{
+			UIElement.mouse_info = GSS.mouse_info;
+			UIElement.update();
 		}
 		else if(GSS.state == 3)
 		{

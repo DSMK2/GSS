@@ -34,7 +34,7 @@ function GSSProjectile(GSSEntity_parent, options) {
 	options = extend(GSSProjectile.defaults, options);
 	
 	this.parent = GSSEntity_parent;
-	
+	this.image_data = options.image_data;
 	this.lifetime_end = Date.now()+options.lifetime;
 	this.mark_for_delete = false;
 
@@ -70,12 +70,13 @@ function GSSProjectile(GSSEntity_parent, options) {
 	this.destroyed = false;
 	
 	// BEGIN: THREE.js
-	this.mesh_data = GSS.image_data[options.image_data.image_index];
-	this.image_frames = options.image_frames;
+	this.mesh_data = GSS.image_data[this.image_data.image_index];
+	this.image_frames = this.image_data.horizontal_frames;
 	this.image_frame_rate = options.image_frame_rate;
 	this.image_frame_current = 0;
 	
 	this.texture = this.mesh_data.texture.clone();
+	this.texture.repeat.x = (this.texture.image.width/this.image_data.horizontal_frames)/this.texture.image.width;
 	this.texture.needsUpdate = true;
 	this.acceleration = options.acceleration;
 	this.material = new THREE.MeshBasicMaterial({map: this.texture, wireframe: false, transparent: true});

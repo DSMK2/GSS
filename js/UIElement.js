@@ -1,51 +1,63 @@
-var UIElement = {
-	mouse_info: {x: -1, y: -1, left_click: false, right_click: false, middle_click: false},
-	mouse_position: new THREE.Vector2(),
-	raycaster: new THREE.Raycaster(),
-	scene: null,
-	camera: null,
-	debug: false,
+UIElement.init = function(renderer, scene, camera, debug)
+{
+	UIElement.renderer = renderer;
+	UIElement.scene = scene;
+	UIElement.camera = camera;
+	
+	UIElement.mouse_info = {x: -1, y: -1, left_click: false, right_click: false, middle_click: false};
+	UIElement.mouse_position = new THREE.Vector2();
+	UIElement.raycaster = new THREE.Raycaster();
+	UIElement.debug = debug === undefined ? false : debug;
+	UIElement.elements = [];
+	UIElement.init_flag = true;
 	/**
 	* Get UIElement mouse over
 	*/
-	update: function(){
-		if(UIElement.scene === undefined && UIElement.camera === undefined)
+	UIElement.update = function(){
+		if(UIElement.renderer === undefined && UIElement.scene === undefined && UIElement.camera === undefined)
 			return;
 		
 		// Because calling 'this' repeatedly is getting old
 		var raycaster = UIElement.raycaster,
 		mouse_position = UIElement.mouse_position,
+		renderer = UIElement.renderer,
 		camera = UIElement.camera,
+		scene = UIElement.scene,
 		intersects,
 		closest,
 		elements = UIElement.elements,
 		element,
 		elements_counter = 0;
 		
+		// Update mouse position
+		mouse_position.x = (UIElement.mouse_info.x/renderer.domElement.width)*2-1;
+		mouse_position.y = -(UIElement.mouse_info.y/renderer.domElement.height)*2+1;
+
 		raycaster.setFromCamera(mouse_position, camera); 
-		intersects = raycaster.insersectsObjects(scene.children);
+		intersects = raycaster.intersectObjects (scene.children);
 		
 		closest = intersects[0];
-		
-		if(intersects.length !== 0 && closest.UIElement !== undefined)
+		if(intersects.length !== 0 && closest.object.UIElement !== undefined)
 		{
-			if(closest.UIElement.state < 3)
+			element = closest.object.UIElement;
+			if(element.state < 3)
 			{
-				if(mouse_info.left_click)
-					closest.UIElement.state = 2;
+				if(UIElement.mouse_info.left_click)
+					element.state = 2;
 				else
-					closest.UIElement.state = 1;
+					element.state = 1;
 			}
 		}
 		
 		for(elements_counter = 0; elements_counter < elements.length; elements_counter++)
 		{
-			element = elements[elements_counters];
-			elements.update();
+			element = elements[elements_counter];
+			element.update();
 		}
-	},
-	elements: []
-};
+	};
+}
+
+
 
 /**
 * Uses Three.js to draw elements.
@@ -69,43 +81,51 @@ function UIElement(options) {
 	},
 	material,
 	image;
+	/* BEGIN: Static members */
 	
-	options = extend(defaults, options);
-	
-	if(UIElement.scene === undefined || UIElement.camera === undefined)
+	if(UIElement.init_flag !== undefined)
 	{
-		if(options.debug) console.error('UIElement: Missing scene or camera', UIElement.scene, UIElement.camera);
-		return;
+		options = extend(defaults, options);
+		
+		if(UIElement.scene === undefined || UIElement.camera === undefined)
+		{
+			console.log('asdf');
+			if(options.debug) console.error('UIElement: Missing scene or camera', UIElement.scene, UIElement.camera);
+			return;
+		}
+		
+		this.horizontal_frames = options.horizontal_frames;
+		this.frame_current = 0;
+		this.vertical_frames = options.vertical_frames;
+		
+		this.frame_delay = options.frame_delay;
+		this.frame_next = Date.now()+this.frame_delay;
+		
+		this.map = options.map.clone();
+		this.map.needsUpdate = true;
+		this.map.repeat.x = (this.map.image.width/this.horizontal_frames)/this.map.image.width;
+		this.map.repeat.y = (this.map.image.height/this.vertical_frames)/this.map.image.height;
+		
+		this.state = options.state;
+		this.debug = options.debug;
+		
+		/* BEGIN: THREE.js */
+		material = new THREE.MeshBasicMaterial({map: this.map, transparent: true});
+		material.side = THREE.DoubleSide;
+		material.shading = THREE.FlatShading;
+		
+		image = this.map.image;
+		
+		this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(image.width/this.horizontal_frames, image.height/this.vertical_frames), material);
+		this.mesh.UIElement = this;
+		this.mesh.scale.x = options.scale;
+		this.mesh.scale.y = options.scale;
+		/* END: THREE.js */
+		UIElement.elements.push(this);
+		return this;
 	}
-	
-	this.map = options.map.clone();
-	this.map.needsUpdate = true;
-	
-	this.horizontal_frames = options.horizontal_frames;
-	this.frame_current = 0;
-	this.vertical_frames = options.vertical_frames;
-	
-	this.frame_delay = options.frame_delay;
-	this.frame_next = Date.now()+this.frame_delay;
-	
-	this.state = option.state;
-	this.debug = options.debug;
-	
-	/* BEGIN: THREE.js */
-	material = new THREE.MeshPhongMaterial({map: this.map, transparent: true});
-	material.side = THREE.DoubleSide;
-	material.shading = THREE.FlatShading;
-	
-	image = map.image;
-	
-	this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(image.width/this.horizontal_frames, image.height/this.vertical_frames), material);
-	this.mesh.UIElement = this;
-	this.mesh.scale.x = options.scale;
-	this.mesh.scale.y = options.scale;
-	UIElement.scene.add(this.mesh);
-	/* END: THREE.js */
-	
-	UIElement.push(this);
+	else
+		if(UIElement.debug) console.error('ERROR: Must call UIElement.init(renderer, scene, camera) before attempting to construct UIElement');
 }
 
 UIElement.prototype = {
@@ -118,20 +138,19 @@ UIElement.prototype = {
 		this.state = new_state;
 	},
 	update: function(){
-		if(this.state === 3)
+		if(this.state === 4)
 			return;
 		
 		var time_now = Date.now();
 		
-		if(time_now >= this.frame_next)
+		if(this.horizontal_frames > 1 && time_now >= this.frame_next)
 		{
 			this.frame_next = time_now + this.frame_delay;
 			this.frame_current++;
 			this.mesh.material.map.offset.x = this.frame_current/this.horizontal_frames;
 		}
 		
-		this.mesh.material.map.offset.y = this.state/4;
-	
+		this.mesh.material.map.offset.y = 1-(this.state/this.vertical_frames)-(1/this.vertical_frames);
 		this.state = 0;
 	}
 }

@@ -22,7 +22,7 @@ function GSSEffect(options){
 	this.id = GSSEffect.id;
 	
 	this.image_data = options.image_data
-	this.image_frames = this.image_data.frames;
+	this.image_frames = this.image_data.horizontal_frames;
 	this.image_frame_current = 0;
 	this.lifetime = Date.now()+options.lifetime;
 	if(options.animate_with_lifetime)
@@ -34,6 +34,7 @@ function GSSEffect(options){
 	// BEGIN: THREE.js 
 	this.mesh_data = GSS.image_data[this.image_data.image_index];
 	this.texture = this.mesh_data.texture.clone();
+	this.texture.repeat.x = (this.texture.image.width/this.image_data.horizontal_frames)/this.texture.image.width;
 	this.texture.needsUpdate = true;
 	this.material = new THREE.MeshBasicMaterial({map: this.texture, wireframe: false, transparent: true});
 	this.material.side = THREE.DoubleSide;
